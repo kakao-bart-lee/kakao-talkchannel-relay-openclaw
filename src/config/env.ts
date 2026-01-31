@@ -20,13 +20,10 @@ const envSchema = z.object({
   // Relay Configuration
   RELAY_BASE_URL: z.string().url('RELAY_BASE_URL must be a valid URL'),
 
-  // Kakao Configuration (required in production for webhook security)
-  KAKAO_SIGNATURE_SECRET: z
-    .string()
-    .optional()
-    .refine((val) => process.env.NODE_ENV !== 'production' || (val && val.length > 0), {
-      message: 'KAKAO_SIGNATURE_SECRET is required in production',
-    }),
+  // Kakao Configuration (optional - see middleware/kakao-signature.ts for details)
+  // If set, validates X-Kakao-Signature header using HMAC-SHA256
+  // Can be configured via Kakao's "헤더값 입력" feature in skill settings
+  KAKAO_SIGNATURE_SECRET: z.string().optional(),
 
   // Queue/Polling Settings
   QUEUE_TTL_SECONDS: z.coerce.number().int().min(60).default(900),
