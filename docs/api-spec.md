@@ -1,6 +1,8 @@
 # Relay Server API Specification
 
-공유 카카오 채널을 통해 다수의 OpenClaw 인스턴스를 연결하는 중계 서버 API 명세.
+> ※ 이 서비스는 카카오에서 제공하는 공식 서비스가 아닙니다.
+
+공유 카카오톡 채널을 통해 다수의 OpenClaw 인스턴스를 연결하는 중계 서버 API 명세.
 
 ## Base URL
 
@@ -28,9 +30,9 @@ Authorization: Bearer <relay_token>
 
 ## Endpoints
 
-### 1. Kakao Webhook (Public)
+### 1. 카카오톡 채널 Webhook (Public)
 
-카카오 플랫폼이 호출하는 웹훅 엔드포인트.
+카카오톡 채널 플랫폼이 호출하는 웹훅 엔드포인트.
 
 ```
 POST /kakao/webhook

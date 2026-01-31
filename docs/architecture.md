@@ -1,13 +1,15 @@
 # Relay Server Architecture
 
+> ※ 이 서비스는 카카오에서 제공하는 공식 서비스가 아닙니다.
+
 ## Overview
 
-Relay Server는 **공유 카카오 채널**을 통해 다수의 OpenClaw 인스턴스를 연결하는 멀티테넌트 메시지 라우터입니다.
+Relay Server는 **공유 카카오톡 채널**을 통해 다수의 OpenClaw 인스턴스를 연결하는 멀티테넌트 메시지 라우터입니다.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         Kakao Platform                              │
-│                    (공유 Talk Channel 봇)                            │
+│                    카카오톡 채널 플랫폼                               │
+│                    (공유 카카오톡 채널 봇)                            │
 └─────────────────────────────────────────────────────────────────────┘
                                   │
                                   │ POST /kakao/webhook
@@ -84,7 +86,7 @@ interface ConversationMapping {
 
 ## Message Flow
 
-### Inbound (Kakao → OpenClaw)
+### Inbound (카카오톡 채널 → OpenClaw)
 
 ```
 1. Kakao webhook 수신
@@ -112,7 +114,7 @@ interface ConversationMapping {
    → accountId에 해당하는 메시지만 반환
 ```
 
-### Outbound (OpenClaw → Kakao)
+### Outbound (OpenClaw → 카카오톡 채널)
 
 ```
 1. OpenClaw 응답 전송

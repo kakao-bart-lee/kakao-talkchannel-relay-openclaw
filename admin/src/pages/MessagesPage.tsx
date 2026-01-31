@@ -136,7 +136,7 @@ function MessageTable({ messages, loading, type }: { messages: any[], loading: b
           <TableRow>
             <TableHead>ID</TableHead>
             <TableHead>Account ID</TableHead>
-            <TableHead>Kakao User</TableHead>
+            <TableHead>채널 사용자</TableHead>
             <TableHead>Content</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created At</TableHead>
