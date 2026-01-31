@@ -6,8 +6,17 @@ export interface User {
 
 export interface Connection {
   conversationKey: string;
-  state: string;
+  state: 'paired' | 'blocked' | 'active';
   lastSeenAt: string;
+}
+
+export interface UnpairResponse {
+  success: boolean;
+}
+
+export interface BlockResponse {
+  success: boolean;
+  state: 'blocked' | 'paired';
 }
 
 export interface PairingCode {
@@ -69,4 +78,14 @@ export const api = {
     }),
 
   getConnections: () => request<Connection[]>('/portal/api/connections'),
+
+  unpairConnection: (conversationKey: string) =>
+    request<UnpairResponse>(`/portal/api/connections/${encodeURIComponent(conversationKey)}/unpair`, {
+      method: 'POST',
+    }),
+
+  blockConnection: (conversationKey: string) =>
+    request<BlockResponse>(`/portal/api/connections/${encodeURIComponent(conversationKey)}/block`, {
+      method: 'PATCH',
+    }),
 };
