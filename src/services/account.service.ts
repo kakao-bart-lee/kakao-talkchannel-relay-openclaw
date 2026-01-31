@@ -1,7 +1,7 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '@/db';
-import type { Account, Mapping } from '@/db/schema';
-import { accounts, mappings } from '@/db/schema';
+import type { Account } from '@/db/schema';
+import { accounts } from '@/db/schema';
 import { ErrorCodes, ServiceError } from '@/errors/service.error';
 import { generateToken, hashToken } from '@/utils/crypto';
 import { logger } from '@/utils/logger';
@@ -83,53 +83,4 @@ export async function updateAccountSettings(
   logger.info('Account settings updated', { accountId: id, settings });
 
   return account;
-}
-
-export async function createOrUpdateMapping(
-  accountId: string,
-  kakaoUserKey: string
-): Promise<Mapping> {
-  const [mapping] = await db
-    .insert(mappings)
-    .values({
-      accountId,
-      kakaoUserKey,
-      lastSeenAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [mappings.accountId, mappings.kakaoUserKey],
-      set: {
-        lastSeenAt: new Date(),
-      },
-    })
-    .returning();
-
-  if (!mapping) {
-    logger.error('Mapping creation returned no result', {
-      accountId,
-      kakaoUserKey,
-    });
-    throw new Error('Failed to create or update mapping');
-  }
-
-  logger.info('Mapping created or updated', {
-    mappingId: mapping.id,
-    accountId,
-    kakaoUserKey,
-  });
-
-  return mapping;
-}
-
-export async function findMappingByKakaoUser(
-  accountId: string,
-  kakaoUserKey: string
-): Promise<Mapping | null> {
-  const [mapping] = await db
-    .select()
-    .from(mappings)
-    .where(and(eq(mappings.accountId, accountId), eq(mappings.kakaoUserKey, kakaoUserKey)))
-    .limit(1);
-
-  return mapping || null;
 }
