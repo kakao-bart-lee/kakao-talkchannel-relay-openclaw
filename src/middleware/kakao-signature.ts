@@ -32,11 +32,20 @@ async function verifyHmacSignature(
 }
 
 /**
- * Hono middleware for Kakao HMAC signature verification.
- * - If KAKAO_SIGNATURE_SECRET is configured, verifies X-Kakao-Signature header
- * - If not configured, skips verification (optional feature)
- * - Returns 401 if signature is invalid
- * - Stores parsed body in context for downstream handlers
+ * Optional HMAC signature verification for Kakao webhooks.
+ *
+ * NOTE: This is NOT an official Kakao feature. Kakao does not provide built-in
+ * webhook signature verification. This middleware enables custom authentication
+ * using Kakao's "헤더값 입력" (Header Value Input) skill setting.
+ *
+ * Setup (if desired):
+ * 1. Generate a secret and set KAKAO_SIGNATURE_SECRET env var
+ * 2. In Kakao i Builder skill settings, add header: X-Kakao-Signature
+ * 3. Compute HMAC-SHA256(secret, request_body) and set as header value
+ *
+ * Behavior:
+ * - If KAKAO_SIGNATURE_SECRET is not set: passes all requests (no verification)
+ * - If set: requires valid X-Kakao-Signature header, returns 401 if invalid
  */
 export function kakaoSignatureMiddleware(): MiddlewareHandler {
   return async (c, next) => {
