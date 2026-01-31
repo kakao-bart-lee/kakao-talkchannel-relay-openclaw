@@ -1,44 +1,43 @@
-FROM oven/bun:1.3-alpine AS builder
+# syntax=docker/dockerfile:1
+
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json ./
-COPY bun.lock* ./
-RUN bun install
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates
 
-COPY src src
-COPY admin admin
-COPY portal portal
-COPY public public
-COPY tsconfig.json biome.json drizzle.config.ts ./
-COPY drizzle drizzle
+# Copy go mod files first for better caching
+COPY go.mod go.sum ./
+RUN go mod download
 
-RUN bun run check
-RUN bun run build:admin
-RUN bun run build:portal
+# Copy source code
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
 
-FROM oven/bun:1.3-alpine AS runner
+# Build binary
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/server
+
+# Runtime stage
+FROM alpine:3.19
+
+RUN apk --no-cache add ca-certificates tzdata wget
 
 WORKDIR /app
 
-RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
+# Copy binary from builder
+COPY --from=builder /app/server .
 
-COPY --from=builder --chown=appuser:appgroup /app/node_modules node_modules
-COPY --from=builder --chown=appuser:appgroup /app/src src
-COPY --from=builder --chown=appuser:appgroup /app/public public
-COPY --from=builder --chown=appuser:appgroup /app/drizzle drizzle
-COPY --from=builder --chown=appuser:appgroup /app/package.json ./
-COPY --from=builder --chown=appuser:appgroup /app/tsconfig.json ./
-COPY --from=builder --chown=appuser:appgroup /app/drizzle.config.ts ./
+# Copy static files
+COPY static/ ./static/
 
+# Create non-root user
+RUN adduser -D -g '' appuser
 USER appuser
-
-ENV NODE_ENV=production
-ENV PORT=8080
 
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD wget -q --spider http://localhost:8080/health || exit 1
 
-CMD ["bun", "run", "src/index.ts"]
+CMD ["./server"]
