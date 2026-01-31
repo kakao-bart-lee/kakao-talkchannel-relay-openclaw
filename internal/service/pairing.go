@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 
 	"github.com/openclaw/relay-server-go/internal/model"
@@ -30,18 +29,15 @@ type VerifyResult struct {
 }
 
 type PairingService struct {
-	db       *sqlx.DB
 	codeRepo repository.PairingCodeRepository
 	convRepo repository.ConversationRepository
 }
 
 func NewPairingService(
-	db *sqlx.DB,
 	codeRepo repository.PairingCodeRepository,
 	convRepo repository.ConversationRepository,
 ) *PairingService {
 	return &PairingService{
-		db:       db,
 		codeRepo: codeRepo,
 		convRepo: convRepo,
 	}
@@ -116,13 +112,6 @@ func (s *PairingService) VerifyCode(ctx context.Context, code, conversationKey s
 		return VerifyResult{Success: false, Error: "INVALID_CODE"}
 	}
 
-	tx, err := s.db.BeginTxx(ctx, nil)
-	if err != nil {
-		log.Error().Err(err).Msg("verify code: begin transaction")
-		return VerifyResult{Success: false, Error: "INVALID_CODE"}
-	}
-	defer tx.Rollback()
-
 	if err := s.codeRepo.MarkUsed(ctx, normalizedCode, conversationKey); err != nil {
 		log.Error().Err(err).Msg("verify code: mark used")
 		return VerifyResult{Success: false, Error: "INVALID_CODE"}
@@ -130,11 +119,6 @@ func (s *PairingService) VerifyCode(ctx context.Context, code, conversationKey s
 
 	if err := s.convRepo.UpdateState(ctx, conversationKey, model.PairingStatePaired, &pc.AccountID); err != nil {
 		log.Error().Err(err).Msg("verify code: update conversation state")
-		return VerifyResult{Success: false, Error: "INVALID_CODE"}
-	}
-
-	if err := tx.Commit(); err != nil {
-		log.Error().Err(err).Msg("verify code: commit transaction")
 		return VerifyResult{Success: false, Error: "INVALID_CODE"}
 	}
 
