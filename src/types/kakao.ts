@@ -44,10 +44,11 @@ export const kakaoWebhookRequestSchema = z
       .object({
         id: z.string(),
         name: z.string(),
-        params: z.record(z.string(), z.string()),
-        detailParams: z.record(z.string(), z.unknown()),
-        clientExtra: z.record(z.string(), z.unknown()).optional(),
+        params: z.record(z.string(), z.string()).nullable().optional(),
+        detailParams: z.record(z.string(), z.unknown()).nullable().optional(),
+        clientExtra: z.record(z.string(), z.unknown()).nullable().optional(),
       })
+      .passthrough()
       .optional(),
     contexts: z.array(z.unknown()).optional(),
   })
