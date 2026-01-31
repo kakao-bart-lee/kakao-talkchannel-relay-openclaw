@@ -188,12 +188,7 @@ func (h *OpenClawHandler) ListPairedConversations(w http.ResponseWriter, r *http
 
 	formatted := make([]map[string]any, len(conversations))
 	for i, conv := range conversations {
-		formatted[i] = map[string]any{
-			"conversationKey": conv.ConversationKey,
-			"state":           conv.State,
-			"pairedAt":        formatTime(conv.PairedAt),
-			"lastSeenAt":      conv.LastSeenAt.Format(time.RFC3339),
-		}
+		formatted[i] = formatConversation(conv)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -269,11 +264,4 @@ func (h *OpenClawHandler) AckMessages(w http.ResponseWriter, r *http.Request) {
 		"acknowledged": acked,
 		"requested":    len(req.MessageIDs),
 	})
-}
-
-func formatTime(t *time.Time) any {
-	if t == nil {
-		return nil
-	}
-	return t.Format(time.RFC3339)
 }

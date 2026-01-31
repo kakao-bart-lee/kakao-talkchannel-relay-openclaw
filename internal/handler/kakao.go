@@ -231,12 +231,6 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 	}
 }
 
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s

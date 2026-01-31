@@ -68,7 +68,7 @@ func main() {
 	defer broker.Close()
 
 	convService := service.NewConversationService(convRepo)
-	pairingService := service.NewPairingService(db.DB, pairingCodeRepo, convRepo)
+	pairingService := service.NewPairingService(pairingCodeRepo, convRepo)
 	messageService := service.NewMessageService(inboundMsgRepo, outboundMsgRepo)
 	kakaoService := service.NewKakaoService()
 	adminService := service.NewAdminService(
