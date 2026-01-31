@@ -101,4 +101,22 @@ export const api = {
     if (status) params.append('status', status);
     return fetchApi<{ items: any[]; total: number }>(`/admin/api/messages/outbound?${params}`);
   },
+
+  // Users
+  getUsers: (limit = 50, offset = 0) =>
+    fetchApi<{ items: any[]; total: number }>(`/admin/api/users?limit=${limit}&offset=${offset}`),
+
+  getUser: (id: string) =>
+    fetchApi<any>(`/admin/api/users/${id}`),
+
+  updateUser: (id: string, data: { isActive?: boolean }) =>
+    fetchApi<any>(`/admin/api/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteUser: (id: string) =>
+    fetchApi<{ success: true }>(`/admin/api/users/${id}`, {
+      method: 'DELETE',
+    }),
 };
