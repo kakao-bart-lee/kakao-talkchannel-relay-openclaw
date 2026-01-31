@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, UserX, UserCheck, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -7,7 +7,7 @@ import { api, type PortalUser } from '../lib/api';
 
 const PAGE_SIZE = 20;
 
-export function UsersPage() {
+export function UsersPage(): React.ReactElement {
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -15,11 +15,7 @@ export function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUsers(page);
-  }, [page]);
-
-  const loadUsers = async (currentPage: number) => {
+  const loadUsers = useCallback(async (currentPage: number): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
@@ -32,7 +28,11 @@ export function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadUsers(page);
+  }, [page, loadUsers]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
