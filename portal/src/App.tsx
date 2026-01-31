@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
+import TokenPage from './pages/TokenPage';
 
 export default function App() {
   return (
@@ -14,7 +15,7 @@ export default function App() {
         {/* Protected routes with Layout */}
         <Route element={<Layout />}>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/settings/token" element={<div>API 토큰 페이지 (준비 중)</div>} />
+          <Route path="/settings/token" element={<TokenPage />} />
           <Route path="/settings" element={<div>설정 페이지 (준비 중)</div>} />
         </Route>
 
