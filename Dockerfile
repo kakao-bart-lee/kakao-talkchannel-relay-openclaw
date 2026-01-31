@@ -8,12 +8,14 @@ RUN bun install
 
 COPY src src
 COPY admin admin
+COPY portal portal
 COPY public public
 COPY tsconfig.json biome.json drizzle.config.ts ./
 COPY drizzle drizzle
 
 RUN bun run check
 RUN bun run build:admin
+RUN bun run build:portal
 
 FROM oven/bun:1.3-alpine AS runner
 
