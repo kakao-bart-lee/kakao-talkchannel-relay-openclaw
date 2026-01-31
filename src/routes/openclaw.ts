@@ -6,11 +6,14 @@ import { ServiceError } from '@/errors/service.error';
 import { authMiddleware } from '@/middleware/auth';
 import { rateLimitMiddleware } from '@/middleware/rate-limit';
 import { listConversationsByAccount } from '@/services/conversation.service';
+import { sendCallback } from '@/services/kakao.service';
 import {
   acknowledgeMessages,
   createOutboundMessage,
   findInboundMessageById,
   getQueuedMessages,
+  markOutboundFailed,
+  markOutboundSent,
 } from '@/services/message.service';
 import { createPairingCode, unpairConversation } from '@/services/pairing.service';
 import { waitForMessages } from '@/services/polling.service';
@@ -118,6 +121,19 @@ openclawRoutes.post(
         return c.json({ error: 'Message not found' }, HTTP_STATUS.NOT_FOUND);
       }
 
+      const { callbackUrl, callbackExpiresAt } = inboundMessage;
+      const hasValidCallback =
+        callbackUrl && (!callbackExpiresAt || callbackExpiresAt > new Date());
+
+      if (!hasValidCallback) {
+        logger.warn('No valid callback URL for reply', {
+          messageId,
+          hasCallbackUrl: !!callbackUrl,
+          callbackExpired: callbackExpiresAt ? callbackExpiresAt <= new Date() : false,
+        });
+        return c.json({ error: 'Callback URL expired or not available' }, HTTP_STATUS.BAD_REQUEST);
+      }
+
       const outbound = await createOutboundMessage({
         accountId: account.id,
         conversationKey: inboundMessage.conversationKey,
@@ -126,19 +142,44 @@ openclawRoutes.post(
         responsePayload: response,
       });
 
-      logger.info('Reply created', {
-        outboundId: outbound.id,
-        messageId,
-        accountId: account.id,
-      });
+      try {
+        await sendCallback(callbackUrl, response);
+        await markOutboundSent(outbound.id);
 
-      return c.json(
-        {
-          success: true,
-          outboundMessageId: outbound.id,
-        },
-        HTTP_STATUS.OK
-      );
+        logger.info('Reply sent to Kakao', {
+          outboundId: outbound.id,
+          messageId,
+          accountId: account.id,
+        });
+
+        return c.json(
+          {
+            success: true,
+            outboundMessageId: outbound.id,
+            callbackSent: true,
+          },
+          HTTP_STATUS.OK
+        );
+      } catch (callbackError) {
+        const errorMessage =
+          callbackError instanceof Error ? callbackError.message : 'Callback failed';
+        await markOutboundFailed(outbound.id, errorMessage);
+
+        logger.error('Failed to send callback to Kakao', {
+          outboundId: outbound.id,
+          messageId,
+          error: errorMessage,
+        });
+
+        return c.json(
+          {
+            success: false,
+            outboundMessageId: outbound.id,
+            error: 'Failed to send callback to Kakao',
+          },
+          HTTP_STATUS.BAD_GATEWAY
+        );
+      }
     } catch (error) {
       if (error instanceof ServiceError) {
         const statusCode = error.statusCode as 400 | 401 | 403 | 404 | 500;
