@@ -1,26 +1,48 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { Unlink, ShieldBan, ShieldCheck, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { api, type User, type Connection } from '../lib/api';
 
 interface LayoutContext {
   user: User | null;
 }
 
+type FilterType = 'all' | 'paired' | 'blocked';
+
 export default function DashboardPage() {
   const { user } = useOutletContext<LayoutContext>();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const loadConnections = async () => {
+    try {
+      const data = await api.getConnections();
+      setConnections(data);
+    } catch (error) {
+      console.error('Failed to load connections', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    api.getConnections()
-      .then(setConnections)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    loadConnections();
   }, []);
+
+  const filteredConnections = useMemo(() => {
+    if (filter === 'all') return connections;
+    return connections.filter((conn) => {
+      if (filter === 'blocked') return conn.state === 'blocked';
+      return conn.state === 'paired' || conn.state === 'active';
+    });
+  }, [connections, filter]);
 
   const generateCode = async () => {
     try {
@@ -34,6 +56,60 @@ export default function DashboardPage() {
   const copyCode = async () => {
     if (pairingCode) {
       await navigator.clipboard.writeText(pairingCode);
+    }
+  };
+
+  const handleUnpair = async (conversationKey: string) => {
+    if (!confirm('이 연결을 해제하시겠습니까?')) return;
+
+    setActionLoading(conversationKey);
+    try {
+      await api.unpairConnection(conversationKey);
+      setConnections((prev) =>
+        prev.filter((conn) => conn.conversationKey !== conversationKey)
+      );
+    } catch (error) {
+      console.error('Failed to unpair', error);
+      alert('연결 해제에 실패했습니다.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleBlock = async (conversationKey: string, currentState: Connection['state']) => {
+    const isBlocking = currentState !== 'blocked';
+    const message = isBlocking
+      ? '이 연결을 차단하시겠습니까?'
+      : '이 연결의 차단을 해제하시겠습니까?';
+
+    if (!confirm(message)) return;
+
+    setActionLoading(conversationKey);
+    try {
+      const { state } = await api.blockConnection(conversationKey);
+      setConnections((prev) =>
+        prev.map((conn) =>
+          conn.conversationKey === conversationKey
+            ? { ...conn, state }
+            : conn
+        )
+      );
+    } catch (error) {
+      console.error('Failed to toggle block', error);
+      alert('작업에 실패했습니다.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const getStateBadge = (state: Connection['state']) => {
+    switch (state) {
+      case 'blocked':
+        return <Badge variant="destructive">차단됨</Badge>;
+      case 'active':
+        return <Badge variant="default">활성</Badge>;
+      default:
+        return <Badge variant="secondary">연결됨</Badge>;
     }
   };
 
@@ -54,7 +130,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Pairing Code Card */}
         <Card>
           <CardHeader>
@@ -85,38 +161,90 @@ export default function DashboardPage() {
         </Card>
 
         {/* Connections Card */}
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>활성 연결</CardTitle>
-            <CardDescription>
-              연결된 카카오톡 대화 목록
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>연결 관리</CardTitle>
+                <CardDescription>
+                  연결된 카카오톡 대화 목록 ({filteredConnections.length}개)
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={loadConnections}
+                disabled={loading}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+            <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="all">전체</TabsTrigger>
+                <TabsTrigger value="paired">활성</TabsTrigger>
+                <TabsTrigger value="blocked">차단됨</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent>
-            {connections.length === 0 ? (
+            {filteredConnections.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
-                연결된 대화가 없습니다
+                {filter === 'all'
+                  ? '연결된 대화가 없습니다'
+                  : filter === 'blocked'
+                    ? '차단된 연결이 없습니다'
+                    : '활성 연결이 없습니다'}
               </div>
             ) : (
               <div className="space-y-3">
-                {connections.map((conn) => (
-                  <div
-                    key={conn.conversationKey}
-                    className="flex items-center justify-between rounded-lg border bg-card p-3"
-                  >
-                    <div className="mr-4 min-w-0 flex-1">
-                      <div className="truncate font-medium">
-                        {conn.conversationKey}
+                {filteredConnections.map((conn) => {
+                  const isLoading = actionLoading === conn.conversationKey;
+                  const isBlocked = conn.state === 'blocked';
+
+                  return (
+                    <div
+                      key={conn.conversationKey}
+                      className="flex items-center justify-between rounded-lg border bg-card p-3"
+                    >
+                      <div className="mr-4 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-medium">
+                            {conn.conversationKey}
+                          </span>
+                          {getStateBadge(conn.state)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          마지막 활동: {new Date(conn.lastSeenAt).toLocaleString('ko-KR')}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        마지막 활동: {new Date(conn.lastSeenAt).toLocaleString('ko-KR')}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleBlock(conn.conversationKey, conn.state)}
+                          disabled={isLoading}
+                          title={isBlocked ? '차단 해제' : '차단'}
+                        >
+                          {isBlocked ? (
+                            <ShieldCheck className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <ShieldBan className="h-4 w-4 text-yellow-600" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleUnpair(conn.conversationKey)}
+                          disabled={isLoading}
+                          title="연결 해제"
+                        >
+                          <Unlink className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </div>
-                    <Badge variant={conn.state === 'active' ? 'default' : 'secondary'}>
-                      {conn.state === 'active' ? '활성' : conn.state}
-                    </Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
