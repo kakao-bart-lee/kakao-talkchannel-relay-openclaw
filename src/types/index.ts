@@ -8,11 +8,14 @@ export type {
 export type { Env } from '@/config/env';
 export type {
   Account,
+  ConversationMapping,
   InboundMessage,
-  Mapping,
   NewAccount,
+  NewConversationMapping,
   NewInboundMessage,
-  NewMapping,
   NewOutboundMessage,
+  NewPairingCode,
   OutboundMessage,
+  PairingCode,
+  PairingState,
 } from '@/db/schema';

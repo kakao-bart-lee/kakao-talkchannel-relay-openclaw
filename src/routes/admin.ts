@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { HTTP_STATUS } from '@/config/constants';
 import { db } from '@/db';
-import { accounts, inboundMessages, mappings, outboundMessages } from '@/db/schema';
+import { accounts, conversationMappings, inboundMessages, outboundMessages } from '@/db/schema';
 import {
   adminAuthMiddleware,
   adminLogin,
@@ -54,7 +54,7 @@ adminRoutes.get('/api/stats', async (c) => {
     queuedInbound,
   ] = await Promise.all([
     db.select({ count: count() }).from(accounts),
-    db.select({ count: count() }).from(mappings),
+    db.select({ count: count() }).from(conversationMappings),
     db
       .select({ count: count() })
       .from(inboundMessages)
@@ -246,25 +246,31 @@ adminRoutes.get('/api/mappings', async (c) => {
 
   let query = db
     .select({
-      id: mappings.id,
-      kakaoUserKey: mappings.kakaoUserKey,
-      accountId: mappings.accountId,
-      lastSeenAt: mappings.lastSeenAt,
+      id: conversationMappings.id,
+      conversationKey: conversationMappings.conversationKey,
+      plusfriendUserKey: conversationMappings.plusfriendUserKey,
+      accountId: conversationMappings.accountId,
+      state: conversationMappings.state,
+      lastSeenAt: conversationMappings.lastSeenAt,
+      pairedAt: conversationMappings.pairedAt,
     })
-    .from(mappings)
-    .orderBy(desc(mappings.lastSeenAt))
+    .from(conversationMappings)
+    .orderBy(desc(conversationMappings.lastSeenAt))
     .limit(limit)
     .offset(offset);
 
   if (accountId) {
-    query = query.where(eq(mappings.accountId, accountId)) as typeof query;
+    query = query.where(eq(conversationMappings.accountId, accountId)) as typeof query;
   }
 
   const [mappingList, total] = await Promise.all([
     query,
     accountId
-      ? db.select({ count: count() }).from(mappings).where(eq(mappings.accountId, accountId))
-      : db.select({ count: count() }).from(mappings),
+      ? db
+          .select({ count: count() })
+          .from(conversationMappings)
+          .where(eq(conversationMappings.accountId, accountId))
+      : db.select({ count: count() }).from(conversationMappings),
   ]);
 
   return c.json({
@@ -280,9 +286,9 @@ adminRoutes.get('/api/mappings', async (c) => {
 adminRoutes.delete('/api/mappings/:id', async (c) => {
   const id = c.req.param('id');
   const [deleted] = await db
-    .delete(mappings)
-    .where(eq(mappings.id, id))
-    .returning({ id: mappings.id });
+    .delete(conversationMappings)
+    .where(eq(conversationMappings.id, id))
+    .returning({ id: conversationMappings.id });
 
   if (!deleted) {
     return c.json({ error: 'Mapping not found' }, HTTP_STATUS.NOT_FOUND);
@@ -300,7 +306,9 @@ adminRoutes.get('/api/messages/inbound', async (c) => {
   const conditions = [];
   if (accountId) conditions.push(eq(inboundMessages.accountId, accountId));
   if (status)
-    conditions.push(eq(inboundMessages.status, status as 'queued' | 'delivered' | 'expired'));
+    conditions.push(
+      eq(inboundMessages.status, status as 'queued' | 'delivered' | 'acked' | 'expired')
+    );
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

@@ -12,14 +12,17 @@ import { logger } from '@/utils/logger';
 
 export interface CreateInboundMessageInput {
   accountId: string;
+  conversationKey: string;
   kakaoPayload: Record<string, unknown>;
   callbackUrl: string | null;
   callbackExpiresAt: Date | null;
   normalizedMessage?: Record<string, unknown>;
+  sourceEventId?: string;
 }
 
 export interface CreateOutboundMessageInput {
   accountId: string;
+  conversationKey: string;
   inboundMessageId?: string;
   kakaoTarget: Record<string, unknown>;
   responsePayload: Record<string, unknown>;
@@ -37,10 +40,12 @@ export async function createInboundMessage(
     .insert(inboundMessages)
     .values({
       accountId: data.accountId,
+      conversationKey: data.conversationKey,
       kakaoPayload: data.kakaoPayload,
       callbackUrl: data.callbackUrl,
       callbackExpiresAt: data.callbackExpiresAt,
       normalizedMessage: data.normalizedMessage,
+      sourceEventId: data.sourceEventId,
       status: 'queued',
     })
     .returning();
@@ -151,6 +156,7 @@ export async function createOutboundMessage(
     .insert(outboundMessages)
     .values({
       accountId: data.accountId,
+      conversationKey: data.conversationKey,
       inboundMessageId: data.inboundMessageId,
       kakaoTarget: data.kakaoTarget,
       responsePayload: data.responsePayload,
@@ -228,4 +234,26 @@ export async function markOutboundFailed(
   });
 
   return message;
+}
+
+export async function acknowledgeMessages(messageIds: string[]): Promise<number> {
+  if (messageIds.length === 0) return 0;
+
+  logger.info('Acknowledging messages', { count: messageIds.length });
+
+  const result = await db
+    .update(inboundMessages)
+    .set({
+      status: 'acked',
+      ackedAt: sql`NOW()`,
+    })
+    .where(
+      and(sql`${inboundMessages.id} = ANY(${messageIds})`, eq(inboundMessages.status, 'delivered'))
+    );
+
+  const count = (result as unknown as { rowCount: number }).rowCount ?? 0;
+
+  logger.info('Messages acknowledged', { count });
+
+  return count;
 }

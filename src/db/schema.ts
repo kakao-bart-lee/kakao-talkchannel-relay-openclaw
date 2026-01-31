@@ -15,23 +15,22 @@ import {
 // Enums
 // ============================================================================
 
-/**
- * Account mode: 'direct' for direct API calls, 'relay' for polling mode.
- */
 export const accountModeEnum = pgEnum('account_mode', ['direct', 'relay']);
 
-/**
- * Inbound message status tracking.
- */
+export const pairingStateEnum = pgEnum('pairing_state', [
+  'unpaired',
+  'pending',
+  'paired',
+  'blocked',
+]);
+
 export const inboundMessageStatusEnum = pgEnum('inbound_message_status', [
   'queued',
   'delivered',
+  'acked',
   'expired',
 ]);
 
-/**
- * Outbound message status tracking.
- */
 export const outboundMessageStatusEnum = pgEnum('outbound_message_status', [
   'pending',
   'sent',
@@ -42,13 +41,6 @@ export const outboundMessageStatusEnum = pgEnum('outbound_message_status', [
 // Tables
 // ============================================================================
 
-/**
- * Accounts table - stores OpenClaw user accounts and their relay tokens.
- *
- * IMPLEMENTATION NOTE:
- * - relay_token is returned ONCE on account creation, then set to NULL
- * - Only relay_token_hash is stored and used for authentication lookups
- */
 export const accounts = pgTable(
   'accounts',
   {
@@ -63,6 +55,7 @@ export const accounts = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
+    disabledAt: timestamp('disabled_at', { withTimezone: true }),
   },
   (table) => [
     uniqueIndex('accounts_relay_token_hash_idx').on(table.relayTokenHash),
@@ -70,29 +63,50 @@ export const accounts = pgTable(
   ]
 );
 
-/**
- * Mappings table - links Kakao users to OpenClaw accounts.
- */
-export const mappings = pgTable(
-  'mappings',
+export const conversationMappings = pgTable(
+  'conversation_mappings',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    kakaoUserKey: text('kakao_user_key').notNull(),
-    accountId: uuid('account_id')
-      .notNull()
-      .references(() => accounts.id, { onDelete: 'cascade' }),
+    conversationKey: text('conversation_key').notNull().unique(),
+    kakaoChannelId: text('kakao_channel_id').notNull(),
+    plusfriendUserKey: text('plusfriend_user_key').notNull(),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    state: pairingStateEnum('state').notNull().default('unpaired'),
+    lastCallbackUrl: text('last_callback_url'),
+    lastCallbackExpiresAt: timestamp('last_callback_expires_at', { withTimezone: true }),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    pairedAt: timestamp('paired_at', { withTimezone: true }),
   },
   (table) => [
-    index('mappings_account_id_idx').on(table.accountId),
-    index('mappings_kakao_user_key_idx').on(table.kakaoUserKey),
-    uniqueIndex('mappings_account_kakao_user_idx').on(table.accountId, table.kakaoUserKey),
+    index('conversation_mappings_account_id_idx').on(table.accountId),
+    index('conversation_mappings_state_idx').on(table.state),
+    uniqueIndex('conversation_mappings_channel_user_idx').on(
+      table.kakaoChannelId,
+      table.plusfriendUserKey
+    ),
   ]
 );
 
-/**
- * Inbound messages table - stores incoming Kakao webhook messages.
- */
+export const pairingCodes = pgTable(
+  'pairing_codes',
+  {
+    code: text('code').primaryKey(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    usedBy: text('used_by'),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('pairing_codes_account_id_idx').on(table.accountId),
+    index('pairing_codes_expires_at_idx').on(table.expiresAt),
+  ]
+);
+
 export const inboundMessages = pgTable(
   'inbound_messages',
   {
@@ -100,24 +114,25 @@ export const inboundMessages = pgTable(
     accountId: uuid('account_id')
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
+    conversationKey: text('conversation_key').notNull(),
     kakaoPayload: jsonb('kakao_payload').notNull(),
     normalizedMessage: jsonb('normalized_message'),
     callbackUrl: text('callback_url'),
     callbackExpiresAt: timestamp('callback_expires_at', { withTimezone: true }),
     status: inboundMessageStatusEnum('status').notNull().default('queued'),
+    sourceEventId: text('source_event_id').unique(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    ackedAt: timestamp('acked_at', { withTimezone: true }),
   },
   (table) => [
     index('inbound_messages_account_id_idx').on(table.accountId),
+    index('inbound_messages_conversation_key_idx').on(table.conversationKey),
     index('inbound_messages_status_idx').on(table.status),
     index('inbound_messages_created_at_idx').on(table.createdAt),
   ]
 );
 
-/**
- * Outbound messages table - stores responses to be sent to Kakao.
- */
 export const outboundMessages = pgTable(
   'outbound_messages',
   {
@@ -128,6 +143,7 @@ export const outboundMessages = pgTable(
     inboundMessageId: uuid('inbound_message_id').references(() => inboundMessages.id, {
       onDelete: 'set null',
     }),
+    conversationKey: text('conversation_key').notNull(),
     kakaoTarget: jsonb('kakao_target').notNull(),
     responsePayload: jsonb('response_payload').notNull(),
     status: outboundMessageStatusEnum('status').notNull().default('pending'),
@@ -138,6 +154,7 @@ export const outboundMessages = pgTable(
   (table) => [
     index('outbound_messages_account_id_idx').on(table.accountId),
     index('outbound_messages_inbound_message_id_idx').on(table.inboundMessageId),
+    index('outbound_messages_conversation_key_idx').on(table.conversationKey),
     index('outbound_messages_status_idx').on(table.status),
   ]
 );
@@ -147,14 +164,22 @@ export const outboundMessages = pgTable(
 // ============================================================================
 
 export const accountsRelations = relations(accounts, ({ many }) => ({
-  mappings: many(mappings),
+  conversationMappings: many(conversationMappings),
+  pairingCodes: many(pairingCodes),
   inboundMessages: many(inboundMessages),
   outboundMessages: many(outboundMessages),
 }));
 
-export const mappingsRelations = relations(mappings, ({ one }) => ({
+export const conversationMappingsRelations = relations(conversationMappings, ({ one }) => ({
   account: one(accounts, {
-    fields: [mappings.accountId],
+    fields: [conversationMappings.accountId],
+    references: [accounts.id],
+  }),
+}));
+
+export const pairingCodesRelations = relations(pairingCodes, ({ one }) => ({
+  account: one(accounts, {
+    fields: [pairingCodes.accountId],
     references: [accounts.id],
   }),
 }));
@@ -185,11 +210,18 @@ export const outboundMessagesRelations = relations(outboundMessages, ({ one }) =
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
 
-export type Mapping = typeof mappings.$inferSelect;
-export type NewMapping = typeof mappings.$inferInsert;
+export type ConversationMapping = typeof conversationMappings.$inferSelect;
+export type NewConversationMapping = typeof conversationMappings.$inferInsert;
+
+export type PairingCode = typeof pairingCodes.$inferSelect;
+export type NewPairingCode = typeof pairingCodes.$inferInsert;
 
 export type InboundMessage = typeof inboundMessages.$inferSelect;
 export type NewInboundMessage = typeof inboundMessages.$inferInsert;
 
 export type OutboundMessage = typeof outboundMessages.$inferSelect;
 export type NewOutboundMessage = typeof outboundMessages.$inferInsert;
+
+export type PairingState = 'unpaired' | 'pending' | 'paired' | 'blocked';
+export type InboundMessageStatus = 'queued' | 'delivered' | 'acked' | 'expired';
+export type OutboundMessageStatus = 'pending' | 'sent' | 'failed';
