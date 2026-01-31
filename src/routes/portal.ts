@@ -1,4 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
+import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
@@ -13,6 +14,16 @@ import { logger } from '@/utils/logger';
 
 const SESSION_COOKIE_NAME = 'portal_session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+
+function setSessionCookie(c: Context, token: string): void {
+  setCookie(c, SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'Lax',
+    maxAge: SESSION_MAX_AGE,
+    path: '/portal',
+  });
+}
 
 const signupSchema = z.object({
   email: z.string().email(),
@@ -43,20 +54,10 @@ portalRoutes.post(
     try {
       const user = await signup({ email, password });
       const token = await createSession(user.id, SESSION_MAX_AGE);
-
-      setCookie(c, SESSION_COOKIE_NAME, token, {
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'Lax',
-        maxAge: SESSION_MAX_AGE,
-        path: '/portal',
-      });
+      setSessionCookie(c, token);
 
       return c.json(
-        {
-          success: true,
-          user: { id: user.id, email: user.email },
-        },
+        { success: true, user: { id: user.id, email: user.email } },
         HTTP_STATUS.CREATED
       );
     } catch (error) {
@@ -82,19 +83,9 @@ portalRoutes.post(
     try {
       const user = await login({ email, password });
       const token = await createSession(user.id, SESSION_MAX_AGE);
+      setSessionCookie(c, token);
 
-      setCookie(c, SESSION_COOKIE_NAME, token, {
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'Lax',
-        maxAge: SESSION_MAX_AGE,
-        path: '/portal',
-      });
-
-      return c.json({
-        success: true,
-        user: { id: user.id, email: user.email },
-      });
+      return c.json({ success: true, user: { id: user.id, email: user.email } });
     } catch (error) {
       if (error instanceof ServiceError) {
         return c.json({ error: error.message }, error.statusCode as 401 | 500);
