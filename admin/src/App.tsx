@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { MappingsPage } from './pages/MappingsPage';
 import { MessagesPage } from './pages/MessagesPage';
+import { UsersPage } from './pages/UsersPage';
 
 function ProtectedLayout() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route element={<ProtectedLayout />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/users" element={<UsersPage />} />
           <Route path="/mappings" element={<MappingsPage />} />
           <Route path="/messages" element={<MessagesPage />} />
         </Route>
