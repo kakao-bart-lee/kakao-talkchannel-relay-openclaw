@@ -17,6 +17,7 @@ type AccountRepository interface {
 	FindAll(ctx context.Context, limit, offset int) ([]model.Account, error)
 	Create(ctx context.Context, params model.CreateAccountParams) (*model.Account, error)
 	Update(ctx context.Context, id string, params model.UpdateAccountParams) (*model.Account, error)
+	UpdateToken(ctx context.Context, id, token, tokenHash string) (*model.Account, error)
 	Delete(ctx context.Context, id string) error
 	Count(ctx context.Context) (int, error)
 }
@@ -114,4 +115,23 @@ func (r *accountRepo) Count(ctx context.Context) (int, error) {
 	var count int
 	err := r.db.GetContext(ctx, &count, `SELECT COUNT(*) FROM accounts`)
 	return count, err
+}
+
+func (r *accountRepo) UpdateToken(ctx context.Context, id, token, tokenHash string) (*model.Account, error) {
+	var account model.Account
+	err := r.db.GetContext(ctx, &account, `
+		UPDATE accounts SET
+			relay_token = $2,
+			relay_token_hash = $3,
+			updated_at = $4
+		WHERE id = $1
+		RETURNING *
+	`, id, token, tokenHash, time.Now())
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &account, nil
 }

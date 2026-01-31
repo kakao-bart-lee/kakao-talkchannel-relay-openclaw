@@ -16,6 +16,8 @@ type PortalUserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*model.PortalUser, error)
 	Create(ctx context.Context, params model.CreatePortalUserParams) (*model.PortalUser, error)
 	UpdateLastLogin(ctx context.Context, id string) error
+	UpdatePassword(ctx context.Context, id, passwordHash string) error
+	Delete(ctx context.Context, id string) error
 }
 
 type portalUserRepo struct {
@@ -67,6 +69,18 @@ func (r *portalUserRepo) UpdateLastLogin(ctx context.Context, id string) error {
 	_, err := r.db.ExecContext(ctx, `
 		UPDATE portal_users SET last_login_at = $2 WHERE id = $1
 	`, id, time.Now())
+	return err
+}
+
+func (r *portalUserRepo) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE portal_users SET password_hash = $2 WHERE id = $1
+	`, id, passwordHash)
+	return err
+}
+
+func (r *portalUserRepo) Delete(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM portal_users WHERE id = $1`, id)
 	return err
 }
 
