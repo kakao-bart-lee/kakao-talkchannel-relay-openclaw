@@ -1,9 +1,6 @@
-# Dependencies
-node_modules/
-
-# Build outputs
-dist/
-*.tsbuildinfo
+# Git
+.git/
+.gitignore
 
 # IDE
 .vscode/
@@ -21,10 +18,28 @@ Thumbs.db
 *.log
 logs/
 
-# Git
-.git/
-.gitignore
+# Test files
+*_test.go
+internal/*/testdata/
 
-# Analysis files
+# Documentation (except README)
 *.md
 !README.md
+
+# Local development
+.env
+.env.*
+
+# Old TypeScript files (if any remain)
+node_modules/
+dist/
+*.tsbuildinfo
+admin/
+portal/
+public/
+package.json
+bun.lock
+tsconfig.json
+drizzle.config.ts
+biome.json
+tailwind.config.ts
