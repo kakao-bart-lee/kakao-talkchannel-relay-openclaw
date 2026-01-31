@@ -1,6 +1,5 @@
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
-import { serveStatic } from 'hono/bun';
 import { secureHeaders } from 'hono/secure-headers';
 import { HTTP_STATUS } from '@/config/constants';
 import { errorHandler, requestLogger } from '@/middleware/error-handler';
@@ -10,14 +9,35 @@ import { kakaoRoutes } from '@/routes/kakao';
 import { openclawRoutes } from '@/routes/openclaw';
 import { portalRoutes } from '@/routes/portal';
 
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+};
+
 function createSpaHandler(basePath: string) {
-  const indexPath = `./public${basePath}/index.html`;
+  const indexFile = Bun.file(`./public${basePath}/index.html`);
+
   return async (c: Context, next: Next) => {
     if (c.req.path.startsWith(`${basePath}/api/`)) return next();
-    const staticHandler = serveStatic({ root: './public' });
-    const res = await staticHandler(c, next);
-    if (res) return res;
-    return serveStatic({ path: indexPath })(c, next);
+
+    const filePath = `./public${c.req.path}`;
+    const file = Bun.file(filePath);
+
+    if (await file.exists()) {
+      const ext = filePath.substring(filePath.lastIndexOf('.'));
+      const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+      return new Response(file, { headers: { 'Content-Type': contentType } });
+    }
+
+    return new Response(indexFile, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
   };
 }
 
