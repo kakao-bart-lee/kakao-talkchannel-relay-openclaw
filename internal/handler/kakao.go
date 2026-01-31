@@ -10,6 +10,7 @@ import (
 
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/service"
+	"github.com/openclaw/relay-server-go/internal/sse"
 )
 
 type Command struct {
@@ -46,6 +47,7 @@ type KakaoHandler struct {
 	convService    *service.ConversationService
 	pairingService *service.PairingService
 	messageService *service.MessageService
+	broker         *sse.Broker
 	callbackTTL    time.Duration
 }
 
@@ -53,12 +55,14 @@ func NewKakaoHandler(
 	convService *service.ConversationService,
 	pairingService *service.PairingService,
 	messageService *service.MessageService,
+	broker *sse.Broker,
 	callbackTTL time.Duration,
 ) *KakaoHandler {
 	return &KakaoHandler{
 		convService:    convService,
 		pairingService: pairingService,
 		messageService: messageService,
+		broker:         broker,
 		callbackTTL:    callbackTTL,
 	}
 }
@@ -125,7 +129,7 @@ func (h *KakaoHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 		"channelId": channelID,
 	})
 
-	_, err = h.messageService.CreateInbound(ctx, service.CreateInboundParams{
+	msg, err := h.messageService.CreateInbound(ctx, service.CreateInboundParams{
 		AccountID:         *conv.AccountID,
 		ConversationKey:   conversationKey,
 		KakaoPayload:      req.ToJSON(),
@@ -135,6 +139,22 @@ func (h *KakaoHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Error().Err(err).Msg("failed to create inbound message")
+		writeJSON(w, http.StatusOK, NewCallbackResponse())
+		return
+	}
+
+	eventData, _ := json.Marshal(map[string]any{
+		"id":              msg.ID,
+		"conversationKey": conversationKey,
+		"message":         json.RawMessage(normalizedMsg),
+		"createdAt":       msg.CreatedAt,
+	})
+
+	if err := h.broker.Publish(ctx, *conv.AccountID, sse.Event{
+		Type: "message",
+		Data: eventData,
+	}); err != nil {
+		log.Warn().Err(err).Msg("failed to publish message event")
 	}
 
 	writeJSON(w, http.StatusOK, NewCallbackResponse())
