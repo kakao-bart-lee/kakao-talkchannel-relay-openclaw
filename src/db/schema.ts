@@ -125,6 +125,24 @@ export const portalUsers = pgTable(
   ]
 );
 
+export const portalSessions = pgTable(
+  'portal_sessions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tokenHash: text('token_hash').notNull().unique(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => portalUsers.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('portal_sessions_token_hash_idx').on(table.tokenHash),
+    index('portal_sessions_user_id_idx').on(table.userId),
+    index('portal_sessions_expires_at_idx').on(table.expiresAt),
+  ]
+);
+
 export const inboundMessages = pgTable(
   'inbound_messages',
   {
@@ -189,10 +207,18 @@ export const accountsRelations = relations(accounts, ({ many, one }) => ({
   portalUser: one(portalUsers),
 }));
 
-export const portalUsersRelations = relations(portalUsers, ({ one }) => ({
+export const portalUsersRelations = relations(portalUsers, ({ one, many }) => ({
   account: one(accounts, {
     fields: [portalUsers.accountId],
     references: [accounts.id],
+  }),
+  sessions: many(portalSessions),
+}));
+
+export const portalSessionsRelations = relations(portalSessions, ({ one }) => ({
+  user: one(portalUsers, {
+    fields: [portalSessions.userId],
+    references: [portalUsers.id],
   }),
 }));
 
@@ -244,6 +270,9 @@ export type NewPairingCode = typeof pairingCodes.$inferInsert;
 
 export type PortalUser = typeof portalUsers.$inferSelect;
 export type NewPortalUser = typeof portalUsers.$inferInsert;
+
+export type PortalSession = typeof portalSessions.$inferSelect;
+export type NewPortalSession = typeof portalSessions.$inferInsert;
 
 export type InboundMessage = typeof inboundMessages.$inferSelect;
 export type NewInboundMessage = typeof inboundMessages.$inferInsert;
