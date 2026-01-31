@@ -28,13 +28,23 @@ app.route('/openclaw', openclawRoutes);
 app.route('/admin', adminRoutes);
 app.route('/portal', portalRoutes);
 
-app.use('/admin/*', serveStatic({ root: './public' }));
 app.get('/admin', serveStatic({ path: './public/admin/index.html' }));
-app.get('/admin/*', serveStatic({ path: './public/admin/index.html' }));
+app.get('/admin/*', async (c, next) => {
+  if (c.req.path.startsWith('/admin/api/')) return next();
+  const staticHandler = serveStatic({ root: './public' });
+  const res = await staticHandler(c, next);
+  if (res) return res;
+  return serveStatic({ path: './public/admin/index.html' })(c, next);
+});
 
-app.use('/portal/*', serveStatic({ root: './public' }));
 app.get('/portal', serveStatic({ path: './public/portal/index.html' }));
-app.get('/portal/*', serveStatic({ path: './public/portal/index.html' }));
+app.get('/portal/*', async (c, next) => {
+  if (c.req.path.startsWith('/portal/api/')) return next();
+  const staticHandler = serveStatic({ root: './public' });
+  const res = await staticHandler(c, next);
+  if (res) return res;
+  return serveStatic({ path: './public/portal/index.html' })(c, next);
+});
 
 app.notFound((c) => {
   return c.json({ error: 'Not Found' }, HTTP_STATUS.NOT_FOUND);
