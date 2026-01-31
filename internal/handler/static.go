@@ -10,22 +10,29 @@ import (
 )
 
 type SPAHandler struct {
-	staticDir string
-	indexFile string
+	staticDir   string
+	indexFile   string
+	routePrefix string
 }
 
-func NewSPAHandler(staticDir string) *SPAHandler {
+func NewSPAHandler(staticDir string, routePrefix string) *SPAHandler {
 	return &SPAHandler{
-		staticDir: staticDir,
-		indexFile: "index.html",
+		staticDir:   staticDir,
+		indexFile:   "index.html",
+		routePrefix: routePrefix,
 	}
 }
 
 func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Get the wildcard path from Chi router context
+	// Get the path relative to the route prefix
+	// First try wildcard param (for Handle("/*")), then fall back to URL path (for NotFound)
 	path := chi.URLParam(r, "*")
+	if path == "" {
+		path = strings.TrimPrefix(r.URL.Path, h.routePrefix)
+		path = strings.TrimPrefix(path, "/")
+	}
 
-	// Redirect to trailing slash if path is empty (e.g., /portal -> /portal/)
+	// Redirect to trailing slash if at root of route (e.g., /portal -> /portal/)
 	if path == "" && !strings.HasSuffix(r.URL.Path, "/") {
 		http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
 		return
@@ -57,6 +64,6 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, indexPath)
 }
 
-func StaticFileServer(staticDir string) http.Handler {
-	return NewSPAHandler(staticDir)
+func StaticFileServer(staticDir string, routePrefix string) http.Handler {
+	return NewSPAHandler(staticDir, routePrefix)
 }

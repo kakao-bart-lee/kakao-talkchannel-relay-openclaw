@@ -32,7 +32,7 @@ func TestSPAHandler(t *testing.T) {
 	err = os.WriteFile(filepath.Join(tmpDir, "app.js"), []byte(jsContent), 0644)
 	require.NoError(t, err)
 
-	handler := NewSPAHandler(tmpDir)
+	handler := NewSPAHandler(tmpDir, "")
 
 	t.Run("serves index.html for root path", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
@@ -98,7 +98,7 @@ func TestSPAHandler_NoIndexFile(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	handler := NewSPAHandler(tmpDir)
+	handler := NewSPAHandler(tmpDir, "")
 
 	t.Run("returns 404 when index.html is missing", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
@@ -112,7 +112,7 @@ func TestSPAHandler_NoIndexFile(t *testing.T) {
 
 func TestStaticFileServer(t *testing.T) {
 	t.Run("returns SPAHandler", func(t *testing.T) {
-		handler := StaticFileServer("/tmp/test")
+		handler := StaticFileServer("/tmp/test", "/portal")
 		assert.NotNil(t, handler)
 		_, ok := handler.(*SPAHandler)
 		assert.True(t, ok)
