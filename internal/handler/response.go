@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/openclaw/relay-server-go/internal/httputil"
@@ -26,4 +27,8 @@ func formatConversation(conv model.ConversationMapping) map[string]any {
 		"pairedAt":        formatTime(conv.PairedAt),
 		"lastSeenAt":      conv.LastSeenAt.Format(time.RFC3339),
 	}
+}
+
+func parseIntParam(s string) (int, error) {
+	return strconv.Atoi(s)
 }

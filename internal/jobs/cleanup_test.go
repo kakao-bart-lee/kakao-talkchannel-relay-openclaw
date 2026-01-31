@@ -122,6 +122,10 @@ func (m *mockInboundMsgRepo) CountByStatus(ctx context.Context, status model.Inb
 	return 0, nil
 }
 
+func (m *mockInboundMsgRepo) CountByAccountID(ctx context.Context, accountID string) (int, error) {
+	return 0, nil
+}
+
 func TestCleanupJob(t *testing.T) {
 	t.Run("creates job with correct interval", func(t *testing.T) {
 		job := NewCleanupJob(nil, nil, nil, nil, 5*time.Minute)

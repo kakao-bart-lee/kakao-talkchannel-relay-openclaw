@@ -106,3 +106,136 @@ func (s *MessageService) MarkOutboundSent(ctx context.Context, id string) error 
 func (s *MessageService) MarkOutboundFailed(ctx context.Context, id, errorMsg string) error {
 	return s.outboundRepo.MarkFailed(ctx, id, errorMsg)
 }
+
+type MessageHistoryParams struct {
+	AccountID string
+	Type      string // "inbound", "outbound", or "" for all
+	Limit     int
+	Offset    int
+}
+
+type MessageHistoryResult struct {
+	Messages []MessageHistoryItem
+	Total    int
+	HasMore  bool
+}
+
+type MessageHistoryItem struct {
+	ID              string          `json:"id"`
+	ConversationKey string          `json:"conversationKey"`
+	Direction       string          `json:"direction"`
+	Content         json.RawMessage `json:"content"`
+	CreatedAt       time.Time       `json:"createdAt"`
+}
+
+func (s *MessageService) GetMessageHistory(ctx context.Context, params MessageHistoryParams) (*MessageHistoryResult, error) {
+	var messages []MessageHistoryItem
+	var total int
+
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+	if params.Limit > 100 {
+		params.Limit = 100
+	}
+
+	switch params.Type {
+	case "inbound":
+		inboundMsgs, err := s.inboundRepo.FindByAccountID(ctx, params.AccountID, params.Limit, params.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("find inbound messages: %w", err)
+		}
+		total, err = s.inboundRepo.CountByAccountID(ctx, params.AccountID)
+		if err != nil {
+			return nil, fmt.Errorf("count inbound messages: %w", err)
+		}
+		for _, msg := range inboundMsgs {
+			messages = append(messages, MessageHistoryItem{
+				ID:              msg.ID,
+				ConversationKey: msg.ConversationKey,
+				Direction:       "inbound",
+				Content:         msg.NormalizedMessage,
+				CreatedAt:       msg.CreatedAt,
+			})
+		}
+
+	case "outbound":
+		outboundMsgs, err := s.outboundRepo.FindByAccountID(ctx, params.AccountID, params.Limit, params.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("find outbound messages: %w", err)
+		}
+		total, err = s.outboundRepo.CountByAccountID(ctx, params.AccountID)
+		if err != nil {
+			return nil, fmt.Errorf("count outbound messages: %w", err)
+		}
+		for _, msg := range outboundMsgs {
+			messages = append(messages, MessageHistoryItem{
+				ID:              msg.ID,
+				ConversationKey: msg.ConversationKey,
+				Direction:       "outbound",
+				Content:         msg.ResponsePayload,
+				CreatedAt:       msg.CreatedAt,
+			})
+		}
+
+	default:
+		// Fetch both and merge by created_at
+		inboundMsgs, err := s.inboundRepo.FindByAccountID(ctx, params.AccountID, params.Limit, params.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("find inbound messages: %w", err)
+		}
+		outboundMsgs, err := s.outboundRepo.FindByAccountID(ctx, params.AccountID, params.Limit, params.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("find outbound messages: %w", err)
+		}
+
+		inboundCount, err := s.inboundRepo.CountByAccountID(ctx, params.AccountID)
+		if err != nil {
+			return nil, fmt.Errorf("count inbound messages: %w", err)
+		}
+		outboundCount, err := s.outboundRepo.CountByAccountID(ctx, params.AccountID)
+		if err != nil {
+			return nil, fmt.Errorf("count outbound messages: %w", err)
+		}
+		total = inboundCount + outboundCount
+
+		for _, msg := range inboundMsgs {
+			messages = append(messages, MessageHistoryItem{
+				ID:              msg.ID,
+				ConversationKey: msg.ConversationKey,
+				Direction:       "inbound",
+				Content:         msg.NormalizedMessage,
+				CreatedAt:       msg.CreatedAt,
+			})
+		}
+		for _, msg := range outboundMsgs {
+			messages = append(messages, MessageHistoryItem{
+				ID:              msg.ID,
+				ConversationKey: msg.ConversationKey,
+				Direction:       "outbound",
+				Content:         msg.ResponsePayload,
+				CreatedAt:       msg.CreatedAt,
+			})
+		}
+
+		// Sort by created_at descending
+		for i := 0; i < len(messages)-1; i++ {
+			for j := i + 1; j < len(messages); j++ {
+				if messages[j].CreatedAt.After(messages[i].CreatedAt) {
+					messages[i], messages[j] = messages[j], messages[i]
+				}
+			}
+		}
+
+		// Limit results
+		if len(messages) > params.Limit {
+			messages = messages[:params.Limit]
+		}
+	}
+
+	return &MessageHistoryResult{
+		Messages: messages,
+		Total:    total,
+		HasMore:  params.Offset+len(messages) < total,
+	}, nil
+}
