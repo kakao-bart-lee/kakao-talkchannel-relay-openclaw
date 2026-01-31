@@ -11,6 +11,7 @@
     "start": "bun run src/index.ts",
     "build": "bun build src/index.ts --outdir=dist --target=bun",
     "build:admin": "bun build admin/src/main.tsx --outdir=public/admin --minify",
+    "build:portal": "bun build portal/src/main.tsx --outdir=public/portal --minify",
     "build:all": "bun run build:admin && bun run build",
     "check": "bunx biome check src/",
     "format": "bunx biome format --write src/",

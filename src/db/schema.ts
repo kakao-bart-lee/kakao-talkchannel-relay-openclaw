@@ -107,6 +107,24 @@ export const pairingCodes = pgTable(
   ]
 );
 
+export const portalUsers = pgTable(
+  'portal_users',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    email: text('email').notNull().unique(),
+    passwordHash: text('password_hash').notNull(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('portal_users_email_idx').on(table.email),
+    index('portal_users_account_id_idx').on(table.accountId),
+  ]
+);
+
 export const inboundMessages = pgTable(
   'inbound_messages',
   {
@@ -163,11 +181,19 @@ export const outboundMessages = pgTable(
 // Relations
 // ============================================================================
 
-export const accountsRelations = relations(accounts, ({ many }) => ({
+export const accountsRelations = relations(accounts, ({ many, one }) => ({
   conversationMappings: many(conversationMappings),
   pairingCodes: many(pairingCodes),
   inboundMessages: many(inboundMessages),
   outboundMessages: many(outboundMessages),
+  portalUser: one(portalUsers),
+}));
+
+export const portalUsersRelations = relations(portalUsers, ({ one }) => ({
+  account: one(accounts, {
+    fields: [portalUsers.accountId],
+    references: [accounts.id],
+  }),
 }));
 
 export const conversationMappingsRelations = relations(conversationMappings, ({ one }) => ({
@@ -215,6 +241,9 @@ export type NewConversationMapping = typeof conversationMappings.$inferInsert;
 
 export type PairingCode = typeof pairingCodes.$inferSelect;
 export type NewPairingCode = typeof pairingCodes.$inferInsert;
+
+export type PortalUser = typeof portalUsers.$inferSelect;
+export type NewPortalUser = typeof portalUsers.$inferInsert;
 
 export type InboundMessage = typeof inboundMessages.$inferSelect;
 export type NewInboundMessage = typeof inboundMessages.$inferInsert;
