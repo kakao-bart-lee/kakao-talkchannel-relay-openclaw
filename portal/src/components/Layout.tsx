@@ -113,9 +113,3 @@ export default function Layout() {
     </div>
   );
 }
-
-// Hook to access user from child components
-export function useLayoutUser() {
-  const { user } = React.useContext(React.createContext({ user: null as User | null }));
-  return user;
-}

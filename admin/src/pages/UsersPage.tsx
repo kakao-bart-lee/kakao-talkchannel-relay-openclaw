@@ -1,40 +1,40 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, UserX, UserCheck, Trash2 } from 'lucide-react';
+import { RefreshCw, UserX, UserCheck, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { api } from '../lib/api';
+import { api, type PortalUser } from '../lib/api';
 
-interface PortalUser {
-  id: string;
-  email: string;
-  accountId: string;
-  createdAt: string;
-  lastLoginAt: string | null;
-  isActive: boolean;
-}
+const PAGE_SIZE = 20;
 
 export function UsersPage() {
   const [users, setUsers] = useState<PortalUser[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    loadUsers(page);
+  }, [page]);
 
-  const loadUsers = async () => {
+  const loadUsers = async (currentPage: number) => {
     try {
+      setLoading(true);
       setError(null);
-      const { items } = await api.getUsers();
+      const offset = currentPage * PAGE_SIZE;
+      const { items, total: totalCount } = await api.getUsers(PAGE_SIZE, offset);
       setUsers(items);
+      setTotal(totalCount);
     } catch (err) {
       setError(err instanceof Error ? err.message : '사용자를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
   };
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const handleToggleActive = async (user: PortalUser) => {
     const action = user.isActive ? '비활성화' : '활성화';
@@ -86,8 +86,8 @@ export function UsersPage() {
           <h1 className="text-2xl font-bold">사용자 관리</h1>
           <p className="text-muted-foreground">Portal 사용자를 관리합니다.</p>
         </div>
-        <Button variant="outline" onClick={loadUsers}>
-          <RefreshCw className="mr-2 h-4 w-4" />
+        <Button variant="outline" onClick={() => loadUsers(page)} disabled={loading}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           새로고침
         </Button>
       </div>
@@ -100,7 +100,7 @@ export function UsersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>사용자 목록 ({users.length}명)</CardTitle>
+          <CardTitle>사용자 목록 (총 {total}명)</CardTitle>
         </CardHeader>
         <CardContent>
           {users.length === 0 ? (
@@ -163,6 +163,35 @@ export function UsersPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between border-t pt-4">
+              <span className="text-sm text-muted-foreground">
+                {page * PAGE_SIZE + 1} - {Math.min((page + 1) * PAGE_SIZE, total)} / {total}명
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0 || loading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  이전
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1 || loading}
+                >
+                  다음
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
