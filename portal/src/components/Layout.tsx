@@ -11,7 +11,39 @@ const navItems = [
   { to: '/settings', icon: Settings, label: '설정', end: true },
 ];
 
-export default function Layout() {
+interface NavItemProps {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  end?: boolean;
+  variant: 'desktop' | 'mobile';
+}
+
+function NavItem({ to, icon: Icon, label, end, variant }: NavItemProps): React.ReactElement {
+  const isMobile = variant === 'mobile';
+  const baseStyles = isMobile
+    ? 'flex flex-1 items-center justify-center gap-2 rounded-md px-2 py-2 text-xs font-medium transition-colors'
+    : 'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors';
+
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        `${baseStyles} ${
+          isActive
+            ? 'bg-accent text-accent-foreground'
+            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+        }`
+      }
+    >
+      <Icon className="h-4 w-4" />
+      {isMobile ? <span className="hidden xs:inline">{label}</span> : label}
+    </NavLink>
+  );
+}
+
+export default function Layout(): React.ReactElement {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,22 +84,8 @@ export default function Layout() {
 
             {/* Navigation */}
             <nav className="hidden items-center gap-1 md:flex">
-              {navItems.map(({ to, icon: Icon, label, end }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    }`
-                  }
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </NavLink>
+              {navItems.map((item) => (
+                <NavItem key={item.to} {...item} variant="desktop" />
               ))}
             </nav>
           </div>
@@ -86,22 +104,8 @@ export default function Layout() {
 
         {/* Mobile Navigation */}
         <nav className="flex items-center gap-1 border-t px-4 py-2 md:hidden">
-          {navItems.map(({ to, icon: Icon, label, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `flex flex-1 items-center justify-center gap-2 rounded-md px-2 py-2 text-xs font-medium transition-colors ${
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                }`
-              }
-            >
-              <Icon className="h-4 w-4" />
-              <span className="hidden xs:inline">{label}</span>
-            </NavLink>
+          {navItems.map((item) => (
+            <NavItem key={item.to} {...item} variant="mobile" />
           ))}
         </nav>
       </header>

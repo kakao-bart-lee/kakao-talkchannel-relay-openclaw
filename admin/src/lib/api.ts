@@ -101,11 +101,10 @@ export const api = {
       };
     }>('/admin/api/stats'),
 
-  getAccounts: (limit = 50, offset = 0) =>
-    fetchApi<{
-      items: Account[];
-      total: number;
-    }>(`/admin/api/accounts?limit=${limit}&offset=${offset}`),
+  getAccounts: (limit = 50, offset = 0) => {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    return fetchApi<{ items: Account[]; total: number }>(`/admin/api/accounts?${params}`);
+  },
 
   createAccount: (data: { openclawUserId?: string; mode?: string; rateLimitPerMinute?: number }) =>
     fetchApi<Account>('/admin/api/accounts', {
@@ -155,8 +154,10 @@ export const api = {
   },
 
   // Users
-  getUsers: (limit = 50, offset = 0) =>
-    fetchApi<{ items: PortalUser[]; total: number }>(`/admin/api/users?limit=${limit}&offset=${offset}`),
+  getUsers: (limit = 50, offset = 0) => {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    return fetchApi<{ items: PortalUser[]; total: number }>(`/admin/api/users?${params}`);
+  },
 
   getUser: (id: string) =>
     fetchApi<PortalUser>(`/admin/api/users/${id}`),
