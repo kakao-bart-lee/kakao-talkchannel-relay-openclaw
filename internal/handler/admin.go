@@ -14,14 +14,20 @@ import (
 )
 
 type AdminHandler struct {
-	adminService *service.AdminService
-	isProduction bool
+	adminService      *service.AdminService
+	sessionMiddleware func(http.Handler) http.Handler
+	isProduction      bool
 }
 
-func NewAdminHandler(adminService *service.AdminService, isProduction bool) *AdminHandler {
+func NewAdminHandler(
+	adminService *service.AdminService,
+	sessionMiddleware func(http.Handler) http.Handler,
+	isProduction bool,
+) *AdminHandler {
 	return &AdminHandler{
-		adminService: adminService,
-		isProduction: isProduction,
+		adminService:      adminService,
+		sessionMiddleware: sessionMiddleware,
+		isProduction:      isProduction,
 	}
 }
 
@@ -32,6 +38,7 @@ func (h *AdminHandler) Routes() chi.Router {
 	r.Post("/api/logout", h.Logout)
 
 	r.Group(func(r chi.Router) {
+		r.Use(h.sessionMiddleware)
 		r.Get("/api/stats", h.Stats)
 		r.Get("/api/accounts", h.ListAccounts)
 		r.Post("/api/accounts", h.CreateAccount)
