@@ -128,19 +128,11 @@ func main() {
 		r.Mount("/", openclawHandler.Routes())
 	})
 
-	// Redirect /admin to /admin/ for proper relative path resolution
-	r.Get("/admin", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
-	})
 	r.Route("/admin", func(r chi.Router) {
 		r.Mount("/", adminHandler.Routes())
 		r.Handle("/*", handler.StaticFileServer("static/admin"))
 	})
 
-	// Redirect /portal to /portal/ for proper relative path resolution
-	r.Get("/portal", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/portal/", http.StatusMovedPermanently)
-	})
 	r.Route("/portal", func(r chi.Router) {
 		r.Mount("/", portalHandler.Routes())
 		r.Handle("/*", handler.StaticFileServer("static/portal"))

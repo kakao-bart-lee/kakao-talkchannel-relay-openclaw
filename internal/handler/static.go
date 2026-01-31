@@ -24,6 +24,13 @@ func NewSPAHandler(staticDir string) *SPAHandler {
 func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Get the wildcard path from Chi router context
 	path := chi.URLParam(r, "*")
+
+	// Redirect to trailing slash if path is empty (e.g., /portal -> /portal/)
+	if path == "" && !strings.HasSuffix(r.URL.Path, "/") {
+		http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
+		return
+	}
+
 	if path == "" {
 		path = "/"
 	}
