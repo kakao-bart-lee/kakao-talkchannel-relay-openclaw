@@ -5,6 +5,7 @@ import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import TokenPage from './pages/TokenPage';
 import SettingsPage from './pages/SettingsPage';
+import MessagesPage from './pages/MessagesPage';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         {/* Protected routes with Layout */}
         <Route element={<Layout />}>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/messages" element={<MessagesPage />} />
           <Route path="/settings/token" element={<TokenPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
