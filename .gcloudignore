@@ -30,17 +30,17 @@ internal/*/testdata/
 .env
 .env.*
 
-# Old TypeScript files (if any remain)
+# Old TypeScript source files (root level only)
 node_modules/
 dist/
 *.tsbuildinfo
-admin/
-portal/
+/admin/
+/portal/
 bun.lock
 tsconfig.json
 drizzle.config.ts
 biome.json
 tailwind.config.ts
 package.json
-src/
-drizzle/
+/src/
+/drizzle/
