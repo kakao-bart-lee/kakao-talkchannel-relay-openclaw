@@ -2,7 +2,7 @@ app = "kakao-talkchannel-relay"
 primary_region = "nrt"
 
 [build]
-  dockerfile = "Dockerfile.goserver"
+  dockerfile = "Dockerfile"
 
 [env]
   PORT = "8080"
