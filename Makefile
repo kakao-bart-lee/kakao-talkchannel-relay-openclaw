@@ -1,4 +1,4 @@
-.PHONY: help docker-up docker-down docker-logs docker-clean db-shell db-migrate db-reset dev build ui-build check format lint
+.PHONY: help up down docker-up docker-down docker-logs docker-clean db-shell db-migrate db-reset dev build ui-build check format lint
 
 .DEFAULT_GOAL := help
 
@@ -18,6 +18,10 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf ""} /^[a-zA-Z_-]+:.*?##/ { printf "  $(BLUE)%-15s$(RESET) %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 ##@ Docker Commands
+
+up: docker-up ## Start all services (alias)
+
+down: docker-down ## Stop all services (alias)
 
 docker-up: ## Start PostgreSQL and Redis containers
 	docker compose up -d
