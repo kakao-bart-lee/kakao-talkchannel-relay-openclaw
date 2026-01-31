@@ -24,6 +24,11 @@ export interface PairingCode {
   expiresAt: string;
 }
 
+export interface TokenResponse {
+  token: string;
+  createdAt: string;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     ...options,
@@ -87,5 +92,12 @@ export const api = {
   blockConnection: (conversationKey: string) =>
     request<BlockResponse>(`/portal/api/connections/${encodeURIComponent(conversationKey)}/block`, {
       method: 'PATCH',
+    }),
+
+  getToken: () => request<TokenResponse>('/portal/api/token'),
+
+  regenerateToken: () =>
+    request<TokenResponse>('/portal/api/token/regenerate', {
+      method: 'POST',
     }),
 };
