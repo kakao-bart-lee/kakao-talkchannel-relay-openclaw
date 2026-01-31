@@ -143,3 +143,67 @@ func (s *PortalService) createSession(ctx context.Context, userID string) (strin
 
 	return token, nil
 }
+
+func (s *PortalService) GetAccountByID(ctx context.Context, accountID string) (*model.Account, error) {
+	return s.accountRepo.FindByID(ctx, accountID)
+}
+
+func (s *PortalService) RegenerateToken(ctx context.Context, accountID string) (*model.Account, string, error) {
+	newToken, err := util.GenerateToken()
+	if err != nil {
+		return nil, "", err
+	}
+
+	tokenHash := util.HashToken(newToken)
+	account, err := s.accountRepo.UpdateToken(ctx, accountID, newToken, tokenHash)
+	if err != nil {
+		return nil, "", err
+	}
+
+	log.Info().Str("accountId", accountID).Msg("relay token regenerated")
+
+	return account, newToken, nil
+}
+
+func (s *PortalService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil || user == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	if err := s.userRepo.UpdatePassword(ctx, userID, string(hashedPassword)); err != nil {
+		return err
+	}
+
+	log.Info().Str("userId", userID).Msg("portal user password changed")
+
+	return nil
+}
+
+func (s *PortalService) DeleteAccount(ctx context.Context, userID, password string) error {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil || user == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := s.accountRepo.Delete(ctx, user.AccountID); err != nil {
+		return err
+	}
+
+	log.Info().Str("userId", userID).Str("accountId", user.AccountID).Msg("portal user account deleted")
+
+	return nil
+}
