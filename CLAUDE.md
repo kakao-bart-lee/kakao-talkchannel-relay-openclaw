@@ -109,3 +109,15 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Commit Convention (release-please)
+
+```
+<type>(<scope>): <description>
+```
+
+| Type | Bump | `feat` MINOR, `fix` PATCH, `feat!`/`fix!` MAJOR |
+|------|------|------------------------------------------------|
+| Scopes | `api`, `kakao`, `admin`, `portal`, `db`, `sse`, `auth`, `deps` |
+
+- 영어, 소문자, 마침표 없음
