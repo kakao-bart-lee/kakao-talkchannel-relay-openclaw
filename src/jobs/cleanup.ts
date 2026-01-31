@@ -1,15 +1,20 @@
 import { markExpiredMessages } from '@/services/message.service';
+import { cleanupExpiredSessions } from '@/services/session.service';
 import { logger } from '@/utils/logger';
 
-const CLEANUP_INTERVAL_MS = 60 * 1000; // 1 minute
+const CLEANUP_INTERVAL_MS = 60 * 1000;
 
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 async function runCleanup(): Promise<void> {
   try {
-    const expiredCount = await markExpiredMessages();
-    if (expiredCount > 0) {
-      logger.info('Cleanup completed', { expiredCount });
+    const [expiredMessages, expiredSessions] = await Promise.all([
+      markExpiredMessages(),
+      cleanupExpiredSessions(),
+    ]);
+
+    if (expiredMessages > 0 || expiredSessions > 0) {
+      logger.info('Cleanup completed', { expiredMessages, expiredSessions });
     }
   } catch (error) {
     logger.error('Cleanup job failed', {
