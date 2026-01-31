@@ -100,4 +100,16 @@ export const api = {
     request<TokenResponse>('/portal/api/token/regenerate', {
       method: 'POST',
     }),
+
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    request<void>('/portal/api/password', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteAccount: (password: string) =>
+    request<void>('/portal/api/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    }),
 };
