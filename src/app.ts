@@ -7,6 +7,7 @@ import { adminRoutes } from '@/routes/admin';
 import { healthRoutes } from '@/routes/health';
 import { kakaoRoutes } from '@/routes/kakao';
 import { openclawRoutes } from '@/routes/openclaw';
+import { portalRoutes } from '@/routes/portal';
 
 const app = new Hono();
 
@@ -25,10 +26,15 @@ app.route('/health', healthRoutes);
 app.route('/kakao', kakaoRoutes);
 app.route('/openclaw', openclawRoutes);
 app.route('/admin', adminRoutes);
+app.route('/portal', portalRoutes);
 
 app.use('/admin/*', serveStatic({ root: './public' }));
 app.get('/admin', serveStatic({ path: './public/admin/index.html' }));
 app.get('/admin/*', serveStatic({ path: './public/admin/index.html' }));
+
+app.use('/portal/*', serveStatic({ root: './public' }));
+app.get('/portal', serveStatic({ path: './public/portal/index.html' }));
+app.get('/portal/*', serveStatic({ path: './public/portal/index.html' }));
 
 app.notFound((c) => {
   return c.json({ error: 'Not Found' }, HTTP_STATUS.NOT_FOUND);

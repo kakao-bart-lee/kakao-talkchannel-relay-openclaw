@@ -29,6 +29,9 @@ const envSchema = z.object({
   ADMIN_PASSWORD: z.string().min(8, 'ADMIN_PASSWORD must be at least 8 characters').optional(),
   ADMIN_SESSION_SECRET: z.string().min(32).optional(),
 
+  // Portal Configuration
+  PORTAL_SESSION_SECRET: z.string().min(32).optional(),
+
   // Queue/Polling Settings
   QUEUE_TTL_SECONDS: z.coerce.number().int().min(60).default(900),
   MAX_POLL_WAIT_SECONDS: z.coerce.number().int().min(1).max(60).default(30),
