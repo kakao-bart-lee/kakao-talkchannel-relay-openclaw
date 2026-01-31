@@ -65,31 +65,17 @@ func (j *CleanupJob) cleanup() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	adminCount, err := j.adminSessionRepo.DeleteExpired(ctx)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to cleanup admin sessions")
-	} else if adminCount > 0 {
-		log.Info().Int64("count", adminCount).Msg("cleaned up expired admin sessions")
-	}
+	j.runCleanup(ctx, "admin sessions", j.adminSessionRepo.DeleteExpired)
+	j.runCleanup(ctx, "portal sessions", j.portalSessionRepo.DeleteExpired)
+	j.runCleanup(ctx, "pairing codes", j.pairingCodeRepo.DeleteExpired)
+	j.runCleanup(ctx, "inbound messages", j.inboundMsgRepo.MarkExpired)
+}
 
-	portalCount, err := j.portalSessionRepo.DeleteExpired(ctx)
+func (j *CleanupJob) runCleanup(ctx context.Context, name string, fn func(context.Context) (int64, error)) {
+	count, err := fn(ctx)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to cleanup portal sessions")
-	} else if portalCount > 0 {
-		log.Info().Int64("count", portalCount).Msg("cleaned up expired portal sessions")
-	}
-
-	codeCount, err := j.pairingCodeRepo.DeleteExpired(ctx)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to cleanup expired pairing codes")
-	} else if codeCount > 0 {
-		log.Info().Int64("count", codeCount).Msg("cleaned up expired pairing codes")
-	}
-
-	expiredCount, err := j.inboundMsgRepo.MarkExpired(ctx)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to mark expired messages")
-	} else if expiredCount > 0 {
-		log.Info().Int64("count", expiredCount).Msg("marked expired inbound messages")
+		log.Error().Err(err).Msgf("failed to cleanup %s", name)
+	} else if count > 0 {
+		log.Info().Int64("count", count).Msgf("cleaned up %s", name)
 	}
 }

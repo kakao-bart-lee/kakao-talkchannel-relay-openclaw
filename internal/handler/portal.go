@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/openclaw/relay-server-go/internal/middleware"
+	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/service"
 )
 
@@ -186,12 +187,7 @@ func (h *PortalHandler) ListConnections(w http.ResponseWriter, r *http.Request) 
 
 	formatted := make([]map[string]any, len(conversations))
 	for i, conv := range conversations {
-		formatted[i] = map[string]any{
-			"conversationKey": conv.ConversationKey,
-			"state":           conv.State,
-			"pairedAt":        formatTime(conv.PairedAt),
-			"lastSeenAt":      conv.LastSeenAt.Format(time.RFC3339),
-		}
+		formatted[i] = formatConversation(conv)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -200,28 +196,15 @@ func (h *PortalHandler) ListConnections(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (h *PortalHandler) getSessionUser(r *http.Request) *portalUser {
+func (h *PortalHandler) getSessionUser(r *http.Request) *model.PortalUser {
 	cookie, err := r.Cookie(middleware.PortalSessionCookie)
 	if err != nil || cookie.Value == "" {
 		return nil
 	}
 
 	user, err := h.portalService.ValidateSession(r.Context(), cookie.Value)
-	if err != nil || user == nil {
+	if err != nil {
 		return nil
 	}
-
-	return &portalUser{
-		ID:        user.ID,
-		Email:     user.Email,
-		AccountID: user.AccountID,
-		CreatedAt: user.CreatedAt,
-	}
-}
-
-type portalUser struct {
-	ID        string
-	Email     string
-	AccountID string
-	CreatedAt time.Time
+	return user
 }
