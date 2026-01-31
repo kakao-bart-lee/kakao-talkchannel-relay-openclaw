@@ -99,7 +99,7 @@ func main() {
 	)
 	adminHandler := handler.NewAdminHandler(adminService, adminSessionMiddleware.Handler, isProduction)
 	portalHandler := handler.NewPortalHandler(
-		portalService, pairingService, convService, isProduction,
+		portalService, pairingService, convService, messageService, isProduction,
 	)
 
 	r := chi.NewRouter()

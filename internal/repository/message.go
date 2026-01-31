@@ -15,6 +15,7 @@ type InboundMessageRepository interface {
 	FindByID(ctx context.Context, id string) (*model.InboundMessage, error)
 	FindQueuedByAccountID(ctx context.Context, accountID string) ([]model.InboundMessage, error)
 	FindByAccountID(ctx context.Context, accountID string, limit, offset int) ([]model.InboundMessage, error)
+	CountByAccountID(ctx context.Context, accountID string) (int, error)
 	Create(ctx context.Context, params model.CreateInboundMessageParams) (*model.InboundMessage, error)
 	MarkDelivered(ctx context.Context, id string) error
 	MarkAcked(ctx context.Context, id string) error
@@ -61,6 +62,14 @@ func (r *inboundMessageRepo) FindByAccountID(ctx context.Context, accountID stri
 		LIMIT $2 OFFSET $3
 	`, accountID, limit, offset)
 	return msgs, err
+}
+
+func (r *inboundMessageRepo) CountByAccountID(ctx context.Context, accountID string) (int, error) {
+	var count int
+	err := r.db.GetContext(ctx, &count, `
+		SELECT COUNT(*) FROM inbound_messages WHERE account_id = $1
+	`, accountID)
+	return count, err
 }
 
 func (r *inboundMessageRepo) Create(ctx context.Context, params model.CreateInboundMessageParams) (*model.InboundMessage, error) {
@@ -126,6 +135,8 @@ func (r *inboundMessageRepo) CountByStatus(ctx context.Context, status model.Inb
 type OutboundMessageRepository interface {
 	FindByID(ctx context.Context, id string) (*model.OutboundMessage, error)
 	FindPendingByAccountID(ctx context.Context, accountID string) ([]model.OutboundMessage, error)
+	FindByAccountID(ctx context.Context, accountID string, limit, offset int) ([]model.OutboundMessage, error)
+	CountByAccountID(ctx context.Context, accountID string) (int, error)
 	Create(ctx context.Context, params model.CreateOutboundMessageParams) (*model.OutboundMessage, error)
 	MarkSent(ctx context.Context, id string) error
 	MarkFailed(ctx context.Context, id string, errorMsg string) error
@@ -159,6 +170,25 @@ func (r *outboundMessageRepo) FindPendingByAccountID(ctx context.Context, accoun
 		ORDER BY created_at ASC
 	`, accountID)
 	return msgs, err
+}
+
+func (r *outboundMessageRepo) FindByAccountID(ctx context.Context, accountID string, limit, offset int) ([]model.OutboundMessage, error) {
+	var msgs []model.OutboundMessage
+	err := r.db.SelectContext(ctx, &msgs, `
+		SELECT * FROM outbound_messages
+		WHERE account_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
+	`, accountID, limit, offset)
+	return msgs, err
+}
+
+func (r *outboundMessageRepo) CountByAccountID(ctx context.Context, accountID string) (int, error) {
+	var count int
+	err := r.db.GetContext(ctx, &count, `
+		SELECT COUNT(*) FROM outbound_messages WHERE account_id = $1
+	`, accountID)
+	return count, err
 }
 
 func (r *outboundMessageRepo) Create(ctx context.Context, params model.CreateOutboundMessageParams) (*model.OutboundMessage, error) {

@@ -49,6 +49,10 @@ func (m *mockAccountRepo) Count(ctx context.Context) (int, error) {
 	return 0, nil
 }
 
+func (m *mockAccountRepo) UpdateToken(ctx context.Context, id, token, tokenHash string) (*model.Account, error) {
+	return nil, nil
+}
+
 func TestAuthMiddleware(t *testing.T) {
 	testAccount := &model.Account{
 		ID:              "acc-123",
