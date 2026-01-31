@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type SPAHandler struct {
@@ -20,9 +22,13 @@ func NewSPAHandler(staticDir string) *SPAHandler {
 }
 
 func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
+	// Get the wildcard path from Chi router context
+	path := chi.URLParam(r, "*")
+	if path == "" {
+		path = "/"
+	}
 
-	if strings.HasPrefix(path, "/api/") {
+	if strings.HasPrefix(path, "api/") {
 		http.NotFound(w, r)
 		return
 	}
