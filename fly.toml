@@ -4,10 +4,6 @@ primary_region = "nrt"
 [build]
   dockerfile = "Dockerfile"
 
-[env]
-  PORT = "8080"
-  LOG_LEVEL = "info"
-
 [http_service]
   internal_port = 8080
   force_https = true
