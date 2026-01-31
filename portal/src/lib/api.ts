@@ -29,6 +29,20 @@ export interface TokenResponse {
   createdAt: string;
 }
 
+export interface Message {
+  id: string;
+  conversationKey: string;
+  direction: 'inbound' | 'outbound';
+  content: string;
+  createdAt: string;
+}
+
+export interface MessagesResponse {
+  messages: Message[];
+  total: number;
+  hasMore: boolean;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     ...options,
@@ -112,4 +126,13 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify({ password }),
     }),
+
+  getMessages: (params?: { type?: 'inbound' | 'outbound'; limit?: number; offset?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.type) searchParams.set('type', params.type);
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.offset) searchParams.set('offset', String(params.offset));
+    const query = searchParams.toString();
+    return request<MessagesResponse>(`/portal/api/messages${query ? `?${query}` : ''}`);
+  },
 };

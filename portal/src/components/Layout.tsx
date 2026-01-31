@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Settings, Key, LogOut } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Settings, Key, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { api, type User } from '../lib/api';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '대시보드' },
+  { to: '/messages', icon: MessageSquare, label: '메시지' },
   { to: '/settings/token', icon: Key, label: 'API 토큰' },
   { to: '/settings', icon: Settings, label: '설정', end: true },
 ];
