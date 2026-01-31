@@ -1,9 +1,24 @@
 import { eq, lt } from 'drizzle-orm';
 import { env } from '@/config/env';
 import { db } from '@/db';
-import { portalSessions, portalUsers } from '@/db/schema';
+import { type PortalUser, portalSessions, portalUsers } from '@/db/schema';
+import { logger } from '@/utils/logger';
 
-const SESSION_SECRET = env.PORTAL_SESSION_SECRET || 'portal-dev-secret-do-not-use-in-prod';
+function getSessionSecret(): string {
+  if (env.PORTAL_SESSION_SECRET) {
+    return env.PORTAL_SESSION_SECRET;
+  }
+
+  if (env.NODE_ENV === 'production') {
+    logger.error('PORTAL_SESSION_SECRET is required in production');
+    throw new Error('PORTAL_SESSION_SECRET is required in production');
+  }
+
+  logger.warn('Using default session secret - NOT SAFE FOR PRODUCTION');
+  return 'portal-dev-secret-do-not-use-in-prod';
+}
+
+const SESSION_SECRET = getSessionSecret();
 
 export function generateSessionToken(): string {
   const bytes = new Uint8Array(32);
@@ -42,7 +57,7 @@ export async function createSession(userId: string, maxAgeSeconds: number): Prom
   return token;
 }
 
-export async function validateSession(token: string) {
+export async function validateSession(token: string): Promise<PortalUser | null> {
   const tokenHash = await hashSessionToken(token);
 
   const result = await db

@@ -1,3 +1,4 @@
+import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { serveStatic } from 'hono/bun';
 import { secureHeaders } from 'hono/secure-headers';
@@ -8,6 +9,17 @@ import { healthRoutes } from '@/routes/health';
 import { kakaoRoutes } from '@/routes/kakao';
 import { openclawRoutes } from '@/routes/openclaw';
 import { portalRoutes } from '@/routes/portal';
+
+function createSpaHandler(basePath: string) {
+  const indexPath = `./public${basePath}/index.html`;
+  return async (c: Context, next: Next) => {
+    if (c.req.path.startsWith(`${basePath}/api/`)) return next();
+    const staticHandler = serveStatic({ root: './public' });
+    const res = await staticHandler(c, next);
+    if (res) return res;
+    return serveStatic({ path: indexPath })(c, next);
+  };
+}
 
 const app = new Hono();
 
@@ -29,22 +41,10 @@ app.route('/admin', adminRoutes);
 app.route('/portal', portalRoutes);
 
 app.get('/admin', serveStatic({ path: './public/admin/index.html' }));
-app.get('/admin/*', async (c, next) => {
-  if (c.req.path.startsWith('/admin/api/')) return next();
-  const staticHandler = serveStatic({ root: './public' });
-  const res = await staticHandler(c, next);
-  if (res) return res;
-  return serveStatic({ path: './public/admin/index.html' })(c, next);
-});
+app.get('/admin/*', createSpaHandler('/admin'));
 
 app.get('/portal', serveStatic({ path: './public/portal/index.html' }));
-app.get('/portal/*', async (c, next) => {
-  if (c.req.path.startsWith('/portal/api/')) return next();
-  const staticHandler = serveStatic({ root: './public' });
-  const res = await staticHandler(c, next);
-  if (res) return res;
-  return serveStatic({ path: './public/portal/index.html' })(c, next);
-});
+app.get('/portal/*', createSpaHandler('/portal'));
 
 app.notFound((c) => {
   return c.json({ error: 'Not Found' }, HTTP_STATUS.NOT_FOUND);
