@@ -2,37 +2,18 @@ import type { MiddlewareHandler } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { HTTP_STATUS } from '@/config/constants';
 import { env } from '@/config/env';
+import {
+  cleanupExpiredAdminSessions,
+  createAdminSession,
+  deleteAdminSession,
+  validateAdminSession,
+} from '@/services/admin-session.service';
 import { constantTimeEqual } from '@/utils/crypto';
+import { logger } from '@/utils/logger';
 
 const SESSION_COOKIE_NAME = 'admin_session';
 const ONE_DAY_IN_SECONDS = 60 * 60 * 24;
 const SESSION_MAX_AGE = ONE_DAY_IN_SECONDS;
-
-function generateSessionToken(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-async function hashSessionToken(token: string): Promise<string> {
-  const secret = env.ADMIN_SESSION_SECRET || 'default-dev-secret-do-not-use-in-prod';
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(token));
-  return Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-const activeSessions = new Map<string, { expiresAt: number }>();
 
 export function adminAuthMiddleware(): MiddlewareHandler {
   return async (c, next) => {
@@ -42,13 +23,11 @@ export function adminAuthMiddleware(): MiddlewareHandler {
 
     const sessionToken = getCookie(c, SESSION_COOKIE_NAME);
     if (sessionToken) {
-      const sessionHash = await hashSessionToken(sessionToken);
-      const session = activeSessions.get(sessionHash);
-      if (session && session.expiresAt > Date.now()) {
+      const isValid = await validateAdminSession(sessionToken);
+      if (isValid) {
         await next();
         return;
       }
-      activeSessions.delete(sessionHash);
     }
 
     return c.json({ error: 'Unauthorized' }, HTTP_STATUS.UNAUTHORIZED);
@@ -64,11 +43,12 @@ export async function adminLogin(password: string): Promise<string | null> {
     return null;
   }
 
-  const token = generateSessionToken();
-  const hash = await hashSessionToken(token);
-  activeSessions.set(hash, { expiresAt: Date.now() + SESSION_MAX_AGE * 1000 });
-
+  const token = await createAdminSession(SESSION_MAX_AGE);
   return token;
+}
+
+export async function adminLogout(token: string): Promise<void> {
+  await deleteAdminSession(token);
 }
 
 export function setAdminSessionCookie(c: Parameters<MiddlewareHandler>[0], token: string): void {
@@ -85,11 +65,17 @@ export function clearAdminSessionCookie(c: Parameters<MiddlewareHandler>[0]): vo
   deleteCookie(c, SESSION_COOKIE_NAME, { path: '/admin' });
 }
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [hash, session] of activeSessions) {
-    if (session.expiresAt <= now) {
-      activeSessions.delete(hash);
+// Cleanup expired sessions every 5 minutes
+setInterval(
+  async () => {
+    try {
+      const count = await cleanupExpiredAdminSessions();
+      if (count > 0) {
+        logger.info('Cleaned up expired admin sessions', { count });
+      }
+    } catch (error) {
+      logger.error('Failed to cleanup expired admin sessions', { error });
     }
-  }
-}, 60 * 1000);
+  },
+  5 * 60 * 1000
+);

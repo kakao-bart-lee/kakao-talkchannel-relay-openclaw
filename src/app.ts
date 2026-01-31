@@ -57,14 +57,17 @@ app.use('*', requestLogger());
 app.route('/health', healthRoutes);
 app.route('/kakao', kakaoRoutes);
 app.route('/openclaw', openclawRoutes);
-app.route('/admin', adminRoutes);
-app.route('/portal', portalRoutes);
 
+// SPA handlers must be registered before API routes
+// The bypass logic (return next() for /api/) allows API routes to be handled
 app.get('/admin', (c) => c.redirect('/admin/', 301));
 app.get('/admin/*', createSpaHandler('/admin'));
-
 app.get('/portal', (c) => c.redirect('/portal/', 301));
 app.get('/portal/*', createSpaHandler('/portal'));
+
+// API routes - these are reached via next() from SPA handlers
+app.route('/admin', adminRoutes);
+app.route('/portal', portalRoutes);
 
 app.notFound((c) => {
   return c.json({ error: 'Not Found' }, HTTP_STATUS.NOT_FOUND);

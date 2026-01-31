@@ -34,27 +34,51 @@
 }
 
 @layer base {
+  /* Yellow Theme - Light Mode */
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --background: 60 9% 98%;
+    --foreground: 20 14% 4%;
+    --card: 60 9% 98%;
+    --card-foreground: 20 14% 4%;
+    --popover: 60 9% 98%;
+    --popover-foreground: 20 14% 4%;
+    --primary: 47 96% 53%;
+    --primary-foreground: 26 83% 14%;
+    --secondary: 60 5% 90%;
+    --secondary-foreground: 24 10% 10%;
+    --muted: 60 5% 90%;
+    --muted-foreground: 25 5% 45%;
+    --accent: 60 5% 90%;
+    --accent-foreground: 24 10% 10%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --radius: 0.5rem;
+    --border: 20 6% 90%;
+    --input: 20 6% 90%;
+    --ring: 47 96% 53%;
+    --radius: 0.625rem;
+  }
+
+  /* Yellow Theme - Dark Mode */
+  .dark {
+    --background: 20 14% 4%;
+    --foreground: 60 9% 98%;
+    --card: 24 10% 8%;
+    --card-foreground: 60 9% 98%;
+    --popover: 24 10% 8%;
+    --popover-foreground: 60 9% 98%;
+    --primary: 47 96% 53%;
+    --primary-foreground: 26 83% 14%;
+    --secondary: 24 10% 14%;
+    --secondary-foreground: 60 9% 98%;
+    --muted: 24 10% 14%;
+    --muted-foreground: 25 5% 55%;
+    --accent: 24 10% 14%;
+    --accent-foreground: 60 9% 98%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 60 9% 98%;
+    --border: 24 10% 14%;
+    --input: 24 10% 14%;
+    --ring: 47 96% 53%;
   }
 }
 
