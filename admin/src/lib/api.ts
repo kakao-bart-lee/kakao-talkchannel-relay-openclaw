@@ -1,0 +1,104 @@
+export interface ApiError {
+  error: string;
+}
+
+export async function fetchApi<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const res = await fetch(endpoint, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  if (res.status === 401 && !endpoint.includes('/login')) {
+    window.location.href = '/admin/login';
+    throw new Error('Unauthorized');
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(data.error || res.statusText);
+  }
+
+  return res.json();
+}
+
+export const api = {
+  login: (password: string) => 
+    fetchApi<{ success: true }>('/admin/api/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+
+  logout: () => 
+    fetchApi<{ success: true }>('/admin/api/logout', {
+      method: 'POST',
+    }),
+
+  getStats: () => 
+    fetchApi<{
+      accounts: number;
+      mappings: number;
+      messages: {
+        inbound: { today: number; week: number; queued: number };
+        outbound: { today: number; week: number; failed: number };
+      };
+    }>('/admin/api/stats'),
+
+  getAccounts: (limit = 50, offset = 0) =>
+    fetchApi<{
+      items: any[];
+      total: number;
+    }>(`/admin/api/accounts?limit=${limit}&offset=${offset}`),
+
+  createAccount: (data: { openclawUserId?: string; mode?: string; rateLimitPerMinute?: number }) =>
+    fetchApi<any>('/admin/api/accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateAccount: (id: string, data: any) =>
+    fetchApi<any>(`/admin/api/accounts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteAccount: (id: string) =>
+    fetchApi<{ success: true }>(`/admin/api/accounts/${id}`, {
+      method: 'DELETE',
+    }),
+
+  regenerateToken: (id: string) =>
+    fetchApi<{ relayToken: string }>(`/admin/api/accounts/${id}/regenerate-token`, {
+      method: 'POST',
+    }),
+
+  getMappings: (limit = 50, offset = 0, accountId?: string) => {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    if (accountId) params.append('accountId', accountId);
+    return fetchApi<{ items: any[]; total: number }>(`/admin/api/mappings?${params}`);
+  },
+
+  deleteMapping: (id: string) =>
+    fetchApi<{ success: true }>(`/admin/api/mappings/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getInboundMessages: (limit = 50, offset = 0, accountId?: string, status?: string) => {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    if (accountId) params.append('accountId', accountId);
+    if (status) params.append('status', status);
+    return fetchApi<{ items: any[]; total: number }>(`/admin/api/messages/inbound?${params}`);
+  },
+
+  getOutboundMessages: (limit = 50, offset = 0, accountId?: string, status?: string) => {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    if (accountId) params.append('accountId', accountId);
+    if (status) params.append('status', status);
+    return fetchApi<{ items: any[]; total: number }>(`/admin/api/messages/outbound?${params}`);
+  },
+};

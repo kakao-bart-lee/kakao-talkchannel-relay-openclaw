@@ -7,10 +7,13 @@ COPY bun.lock* ./
 RUN bun install
 
 COPY src src
+COPY admin admin
+COPY public public
 COPY tsconfig.json biome.json drizzle.config.ts ./
 COPY drizzle drizzle
 
 RUN bun run check
+RUN bun run build:admin
 
 FROM oven/bun:1.3-alpine AS runner
 
@@ -20,6 +23,7 @@ RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
 
 COPY --from=builder --chown=appuser:appgroup /app/node_modules node_modules
 COPY --from=builder --chown=appuser:appgroup /app/src src
+COPY --from=builder --chown=appuser:appgroup /app/public public
 COPY --from=builder --chown=appuser:appgroup /app/drizzle drizzle
 COPY --from=builder --chown=appuser:appgroup /app/package.json ./
 COPY --from=builder --chown=appuser:appgroup /app/tsconfig.json ./

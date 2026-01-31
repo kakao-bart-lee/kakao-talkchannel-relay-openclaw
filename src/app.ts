@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import { serveStatic } from 'hono/bun';
 import { secureHeaders } from 'hono/secure-headers';
 import { HTTP_STATUS } from '@/config/constants';
 import { errorHandler, requestLogger } from '@/middleware/error-handler';
+import { adminRoutes } from '@/routes/admin';
 import { healthRoutes } from '@/routes/health';
 import { kakaoRoutes } from '@/routes/kakao';
 import { openclawRoutes } from '@/routes/openclaw';
@@ -22,6 +24,11 @@ app.use('*', requestLogger());
 app.route('/health', healthRoutes);
 app.route('/kakao', kakaoRoutes);
 app.route('/openclaw', openclawRoutes);
+app.route('/admin', adminRoutes);
+
+app.use('/admin/*', serveStatic({ root: './public' }));
+app.get('/admin', serveStatic({ path: './public/admin/index.html' }));
+app.get('/admin/*', serveStatic({ path: './public/admin/index.html' }));
 
 app.notFound((c) => {
   return c.json({ error: 'Not Found' }, HTTP_STATUS.NOT_FOUND);
