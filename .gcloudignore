@@ -36,10 +36,11 @@ dist/
 *.tsbuildinfo
 admin/
 portal/
-public/
-package.json
 bun.lock
 tsconfig.json
 drizzle.config.ts
 biome.json
 tailwind.config.ts
+package.json
+src/
+drizzle/
