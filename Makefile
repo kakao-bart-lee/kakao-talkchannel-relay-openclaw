@@ -1,4 +1,4 @@
-.PHONY: help docker-up docker-down docker-logs docker-clean db-shell db-migrate db-generate db-studio db-reset dev build check format lint
+.PHONY: help docker-up docker-down docker-logs docker-clean db-shell db-migrate db-reset dev build ui-build check format lint
 
 .DEFAULT_GOAL := help
 
@@ -7,6 +7,8 @@ BLUE := \033[36m
 GREEN := \033[32m
 YELLOW := \033[33m
 RESET := \033[0m
+
+DATABASE_URL ?= postgresql://postgres:postgres@localhost:5433/kakao_relay
 
 ##@ Help
 
@@ -17,21 +19,21 @@ help: ## Show this help message
 
 ##@ Docker Commands
 
-docker-up: ## Start PostgreSQL container
+docker-up: ## Start PostgreSQL and Redis containers
 	docker compose up -d
-	@echo "$(GREEN)PostgreSQL started. Waiting for health check...$(RESET)"
-	@sleep 3
+	@echo "$(GREEN)PostgreSQL and Redis started. Waiting for health checks...$(RESET)"
+	@sleep 2
 	@docker compose ps
 
-docker-down: ## Stop PostgreSQL container
+docker-down: ## Stop Docker containers
 	docker compose down
 
-docker-logs: ## Follow PostgreSQL logs
-	docker compose logs -f postgres
+docker-logs: ## Follow Docker logs
+	docker compose logs -f
 
-docker-clean: ## Stop and remove PostgreSQL data
+docker-clean: ## Stop and remove Docker volumes
 	docker compose down -v
-	@echo "$(YELLOW)PostgreSQL data volume removed$(RESET)"
+	@echo "$(YELLOW)Docker volumes removed$(RESET)"
 
 ##@ Database Commands
 
@@ -39,13 +41,10 @@ db-shell: ## Open PostgreSQL shell
 	docker compose exec postgres psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-kakao_relay}
 
 db-migrate: ## Run database migrations
-	bun run db:migrate
-
-db-generate: ## Generate new migration from schema changes
-	bun run db:generate
-
-db-studio: ## Open Drizzle Studio
-	bun run db:studio
+	@for f in drizzle/migrations/*.sql; do \
+		echo "Applying $$f"; \
+		psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$$f"; \
+	done
 
 db-reset: ## Reset database (drop and recreate)
 	docker compose exec postgres psql -U $${POSTGRES_USER:-postgres} -c "DROP DATABASE IF EXISTS $${POSTGRES_DB:-kakao_relay};"
@@ -55,19 +54,23 @@ db-reset: ## Reset database (drop and recreate)
 ##@ Development Commands
 
 dev: ## Start development server with hot reload
-	bun run dev
+	go run ./cmd/server
 
 build: ## Build for production
-	bun run build
+	go build ./cmd/server
+
+ui-build: ## Build admin and portal UIs
+	bun run build:admin
+	bun run build:portal
 
 check: ## Run Biome lint and format check
-	bun run check
+	bunx biome check admin/src portal/src
 
 format: ## Format code with Biome
-	bun run format
+	bunx biome format --write admin/src portal/src
 
 lint: ## Lint code with Biome
-	bun run lint
+	bunx biome lint admin/src portal/src
 
 ##@ Quick Start
 
