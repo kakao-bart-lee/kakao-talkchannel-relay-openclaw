@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Link as LinkIcon, MessageSquare, LogOut } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, Link as LinkIcon, MessageSquare, LogOut } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 import { Button } from './ui/button';
@@ -23,10 +23,11 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const navItems = [
-    { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/accounts', label: 'Accounts', icon: Users },
-    { href: '/mappings', label: 'Mappings', icon: LinkIcon },
-    { href: '/messages', label: 'Messages', icon: MessageSquare },
+    { href: '/', label: '대시보드', icon: LayoutDashboard },
+    { href: '/accounts', label: '계정 관리', icon: Building2 },
+    { href: '/users', label: '사용자 관리', icon: Users },
+    { href: '/mappings', label: '연결 관리', icon: LinkIcon },
+    { href: '/messages', label: '메시지', icon: MessageSquare },
   ];
 
   return (

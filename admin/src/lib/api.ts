@@ -2,6 +2,58 @@ export interface ApiError {
   error: string;
 }
 
+export interface Account {
+  id: string;
+  openclawUserId: string | null;
+  relayToken: string;
+  mode: 'development' | 'production';
+  rateLimitPerMinute: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Mapping {
+  id: string;
+  accountId: string;
+  conversationKey: string;
+  kakaoUserId: string;
+  state: 'pending' | 'paired' | 'blocked';
+  createdAt: string;
+  lastSeenAt: string | null;
+}
+
+export interface InboundMessage {
+  id: string;
+  accountId: string;
+  conversationKey: string;
+  messageType: string;
+  content: string;
+  status: 'pending' | 'delivered' | 'failed';
+  createdAt: string;
+  deliveredAt: string | null;
+}
+
+export interface OutboundMessage {
+  id: string;
+  accountId: string;
+  conversationKey: string;
+  messageType: string;
+  content: string;
+  status: 'pending' | 'sent' | 'failed';
+  createdAt: string;
+  sentAt: string | null;
+  errorMessage: string | null;
+}
+
+export interface PortalUser {
+  id: string;
+  email: string;
+  accountId: string;
+  createdAt: string;
+  lastLoginAt: string | null;
+  isActive: boolean;
+}
+
 export async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -49,20 +101,19 @@ export const api = {
       };
     }>('/admin/api/stats'),
 
-  getAccounts: (limit = 50, offset = 0) =>
-    fetchApi<{
-      items: any[];
-      total: number;
-    }>(`/admin/api/accounts?limit=${limit}&offset=${offset}`),
+  getAccounts: (limit = 50, offset = 0) => {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    return fetchApi<{ items: Account[]; total: number }>(`/admin/api/accounts?${params}`);
+  },
 
   createAccount: (data: { openclawUserId?: string; mode?: string; rateLimitPerMinute?: number }) =>
-    fetchApi<any>('/admin/api/accounts', {
+    fetchApi<Account>('/admin/api/accounts', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateAccount: (id: string, data: any) =>
-    fetchApi<any>(`/admin/api/accounts/${id}`, {
+  updateAccount: (id: string, data: Partial<Pick<Account, 'openclawUserId' | 'mode' | 'rateLimitPerMinute'>>) =>
+    fetchApi<Account>(`/admin/api/accounts/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
@@ -80,7 +131,7 @@ export const api = {
   getMappings: (limit = 50, offset = 0, accountId?: string) => {
     const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
     if (accountId) params.append('accountId', accountId);
-    return fetchApi<{ items: any[]; total: number }>(`/admin/api/mappings?${params}`);
+    return fetchApi<{ items: Mapping[]; total: number }>(`/admin/api/mappings?${params}`);
   },
 
   deleteMapping: (id: string) =>
@@ -92,13 +143,33 @@ export const api = {
     const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
     if (accountId) params.append('accountId', accountId);
     if (status) params.append('status', status);
-    return fetchApi<{ items: any[]; total: number }>(`/admin/api/messages/inbound?${params}`);
+    return fetchApi<{ items: InboundMessage[]; total: number }>(`/admin/api/messages/inbound?${params}`);
   },
 
   getOutboundMessages: (limit = 50, offset = 0, accountId?: string, status?: string) => {
     const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
     if (accountId) params.append('accountId', accountId);
     if (status) params.append('status', status);
-    return fetchApi<{ items: any[]; total: number }>(`/admin/api/messages/outbound?${params}`);
+    return fetchApi<{ items: OutboundMessage[]; total: number }>(`/admin/api/messages/outbound?${params}`);
   },
+
+  // Users
+  getUsers: (limit = 50, offset = 0) => {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    return fetchApi<{ items: PortalUser[]; total: number }>(`/admin/api/users?${params}`);
+  },
+
+  getUser: (id: string) =>
+    fetchApi<PortalUser>(`/admin/api/users/${id}`),
+
+  updateUser: (id: string, data: { isActive?: boolean }) =>
+    fetchApi<PortalUser>(`/admin/api/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteUser: (id: string) =>
+    fetchApi<{ success: true }>(`/admin/api/users/${id}`, {
+      method: 'DELETE',
+    }),
 };
