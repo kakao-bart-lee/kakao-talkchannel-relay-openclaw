@@ -69,7 +69,7 @@ export function MappingsPage() {
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Account ID</TableHead>
-              <TableHead>Kakao Channel ID</TableHead>
+              <TableHead>채널 ID</TableHead>
               <TableHead>OpenClaw User ID</TableHead>
               <TableHead>Created At</TableHead>
               <TableHead className="text-right">Actions</TableHead>

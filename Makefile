@@ -8,12 +8,12 @@ GREEN := \033[32m
 YELLOW := \033[33m
 RESET := \033[0m
 
-DATABASE_URL ?= postgresql://postgres:postgres@localhost:5433/kakao_relay
+DATABASE_URL ?= postgresql://postgres:postgres@localhost:5433/talkchannel_relay
 
 ##@ Help
 
 help: ## Show this help message
-	@echo "$(GREEN)Kakao Relay Server$(RESET) - Available commands:"
+	@echo "$(GREEN)카카오톡 채널 릴레이 서버$(RESET) - Available commands:"
 	@echo ""
 	@awk 'BEGIN {FS = ":.*##"; printf ""} /^[a-zA-Z_-]+:.*?##/ { printf "  $(BLUE)%-15s$(RESET) %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
@@ -38,7 +38,7 @@ docker-clean: ## Stop and remove Docker volumes
 ##@ Database Commands
 
 db-shell: ## Open PostgreSQL shell
-	docker compose exec postgres psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-kakao_relay}
+	docker compose exec postgres psql -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-talkchannel_relay}
 
 db-migrate: ## Run database migrations
 	@for f in drizzle/migrations/*.sql; do \
@@ -47,8 +47,8 @@ db-migrate: ## Run database migrations
 	done
 
 db-reset: ## Reset database (drop and recreate)
-	docker compose exec postgres psql -U $${POSTGRES_USER:-postgres} -c "DROP DATABASE IF EXISTS $${POSTGRES_DB:-kakao_relay};"
-	docker compose exec postgres psql -U $${POSTGRES_USER:-postgres} -c "CREATE DATABASE $${POSTGRES_DB:-kakao_relay};"
+	docker compose exec postgres psql -U $${POSTGRES_USER:-postgres} -c "DROP DATABASE IF EXISTS $${POSTGRES_DB:-talkchannel_relay};"
+	docker compose exec postgres psql -U $${POSTGRES_USER:-postgres} -c "CREATE DATABASE $${POSTGRES_DB:-talkchannel_relay};"
 	@echo "$(GREEN)Database reset. Run 'make db-migrate' to apply migrations.$(RESET)"
 
 ##@ Development Commands

@@ -34,10 +34,13 @@ export default function AuthPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">Kakao Relay Portal</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">카카오톡 채널 릴레이</CardTitle>
           <CardDescription className="text-center">
-            Manage your relay connections
+            카카오톡 채널 메시지를 외부 시스템과 연동합니다
           </CardDescription>
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            ※ 이 서비스는 카카오에서 제공하는 공식 서비스가 아닙니다.
+          </p>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">

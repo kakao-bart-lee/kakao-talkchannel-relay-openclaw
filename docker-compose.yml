@@ -1,18 +1,18 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: kakao-relay-postgres
+    container_name: talkchannel-relay-postgres
     restart: unless-stopped
     ports:
       - '5433:5432'
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-kakao_relay}
+      POSTGRES_DB: ${POSTGRES_DB:-talkchannel_relay}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-kakao_relay}']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-talkchannel_relay}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -20,7 +20,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: kakao-relay-redis
+    container_name: talkchannel-relay-redis
     restart: unless-stopped
     ports:
       - '6379:6379'

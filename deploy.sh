@@ -2,7 +2,7 @@
 set -e
 
 # Configuration (matches existing Cloud Run deployment)
-SERVICE_NAME="kakao-talkchannel-relay"
+SERVICE_NAME="talkchannel-relay"
 REGION="asia-northeast3"
 PROJECT_ID="${PROJECT_ID:-{PROJECT_ID}}"
 CLOUD_SQL_INSTANCE="{PROJECT_ID}:asia-northeast3:{INSTANCE_NAME}"
