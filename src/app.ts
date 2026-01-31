@@ -40,10 +40,10 @@ app.route('/openclaw', openclawRoutes);
 app.route('/admin', adminRoutes);
 app.route('/portal', portalRoutes);
 
-app.get('/admin', serveStatic({ path: './public/admin/index.html' }));
+app.get('/admin', (c) => c.redirect('/admin/', 301));
 app.get('/admin/*', createSpaHandler('/admin'));
 
-app.get('/portal', serveStatic({ path: './public/portal/index.html' }));
+app.get('/portal', (c) => c.redirect('/portal/', 301));
 app.get('/portal/*', createSpaHandler('/portal'));
 
 app.notFound((c) => {
