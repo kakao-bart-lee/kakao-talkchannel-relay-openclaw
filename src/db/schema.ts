@@ -143,6 +143,20 @@ export const portalSessions = pgTable(
   ]
 );
 
+export const adminSessions = pgTable(
+  'admin_sessions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('admin_sessions_token_hash_idx').on(table.tokenHash),
+    index('admin_sessions_expires_at_idx').on(table.expiresAt),
+  ]
+);
+
 export const inboundMessages = pgTable(
   'inbound_messages',
   {
@@ -273,6 +287,9 @@ export type NewPortalUser = typeof portalUsers.$inferInsert;
 
 export type PortalSession = typeof portalSessions.$inferSelect;
 export type NewPortalSession = typeof portalSessions.$inferInsert;
+
+export type AdminSession = typeof adminSessions.$inferSelect;
+export type NewAdminSession = typeof adminSessions.$inferInsert;
 
 export type InboundMessage = typeof inboundMessages.$inferSelect;
 export type NewInboundMessage = typeof inboundMessages.$inferInsert;

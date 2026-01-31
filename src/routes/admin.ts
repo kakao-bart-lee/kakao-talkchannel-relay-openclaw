@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { and, count, desc, eq, gte } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { getCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { HTTP_STATUS } from '@/config/constants';
 import { db } from '@/db';
@@ -8,6 +9,7 @@ import { accounts, conversationMappings, inboundMessages, outboundMessages } fro
 import {
   adminAuthMiddleware,
   adminLogin,
+  adminLogout,
   clearAdminSessionCookie,
   setAdminSessionCookie,
 } from '@/middleware/admin-auth';
@@ -31,7 +33,11 @@ adminRoutes.post('/api/login', zValidator('json', loginSchema), async (c) => {
   return c.json({ success: true });
 });
 
-adminRoutes.post('/api/logout', (c) => {
+adminRoutes.post('/api/logout', async (c) => {
+  const token = getCookie(c, 'admin_session');
+  if (token) {
+    await adminLogout(token);
+  }
   clearAdminSessionCookie(c);
   return c.json({ success: true });
 });

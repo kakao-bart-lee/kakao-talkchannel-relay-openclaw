@@ -68,5 +68,5 @@ export const api = {
       body: JSON.stringify({ expirySeconds }),
     }),
 
-  getConnections: () => request<Connection[]>('/portal/api/connections'),
+  getConnections: () => request<{ connections: Connection[]; total: number }>('/portal/api/connections'),
 };

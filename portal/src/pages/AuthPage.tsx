@@ -22,7 +22,7 @@ export default function AuthPage() {
       } else {
         await api.signup({ email, password });
       }
-      navigate('/portal/');
+      navigate('/');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -31,7 +31,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-center">Kakao Relay Portal</CardTitle>
@@ -65,7 +65,7 @@ export default function AuthPage() {
               </div>
               
               {error && (
-                <div className="text-sm text-red-500 text-center">{error}</div>
+                <div className="text-sm text-destructive text-center">{error}</div>
               )}
 
               <TabsContent value="login">

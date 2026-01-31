@@ -26,13 +26,13 @@ function setSessionCookie(c: Context, token: string): void {
 }
 
 const signupSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 const generateCodeSchema = z.object({
@@ -45,7 +45,8 @@ portalRoutes.post(
   '/api/signup',
   zValidator('json', signupSchema, (result, c) => {
     if (!result.success) {
-      return c.json({ error: 'Invalid input' }, HTTP_STATUS.BAD_REQUEST);
+      const errors = result.error.issues.map((e) => e.message).join(', ');
+      return c.json({ error: errors || 'Invalid input' }, HTTP_STATUS.BAD_REQUEST);
     }
   }),
   async (c) => {
@@ -74,7 +75,8 @@ portalRoutes.post(
   '/api/login',
   zValidator('json', loginSchema, (result, c) => {
     if (!result.success) {
-      return c.json({ error: 'Invalid input' }, HTTP_STATUS.BAD_REQUEST);
+      const errors = result.error.issues.map((e) => e.message).join(', ');
+      return c.json({ error: errors || 'Invalid input' }, HTTP_STATUS.BAD_REQUEST);
     }
   }),
   async (c) => {
