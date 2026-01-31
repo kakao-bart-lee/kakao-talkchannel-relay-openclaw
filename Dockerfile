@@ -28,8 +28,8 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/server .
 
-# Copy static files
-COPY static/ ./static/
+# Copy static files (from public/ to static/)
+COPY public/ ./static/
 
 # Create non-root user
 RUN adduser -D -g '' appuser
