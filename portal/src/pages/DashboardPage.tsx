@@ -23,7 +23,7 @@ export default function DashboardPage() {
 
   const loadConnections = async () => {
     try {
-      const data = await api.getConnections();
+      const { connections: data } = await api.getConnections();
       setConnections(data);
     } catch (error) {
       console.error('Failed to load connections', error);
