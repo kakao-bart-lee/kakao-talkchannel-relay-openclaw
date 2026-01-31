@@ -130,12 +130,12 @@ func main() {
 
 	r.Route("/admin", func(r chi.Router) {
 		r.Mount("/", adminHandler.Routes())
-		r.Handle("/*", handler.StaticFileServer("static/admin"))
+		r.NotFound(handler.StaticFileServer("static/admin", "/admin").ServeHTTP)
 	})
 
 	r.Route("/portal", func(r chi.Router) {
 		r.Mount("/", portalHandler.Routes())
-		r.Handle("/*", handler.StaticFileServer("static/portal"))
+		r.NotFound(handler.StaticFileServer("static/portal", "/portal").ServeHTTP)
 	})
 
 	cleanupJob := jobs.NewCleanupJob(
