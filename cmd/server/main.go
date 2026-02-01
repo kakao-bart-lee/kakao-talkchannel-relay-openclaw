@@ -73,7 +73,7 @@ func main() {
 	kakaoService := service.NewKakaoService()
 	adminService := service.NewAdminService(
 		db.DB, adminSessionRepo, accountRepo, convRepo,
-		inboundMsgRepo, outboundMsgRepo,
+		inboundMsgRepo, outboundMsgRepo, portalUserRepo,
 		cfg.AdminPassword, cfg.AdminSessionSecret,
 	)
 	portalService := service.NewPortalService(
@@ -113,6 +113,10 @@ func main() {
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
+	})
+
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/portal", http.StatusFound)
 	})
 
 	r.Route("/kakao", func(r chi.Router) {

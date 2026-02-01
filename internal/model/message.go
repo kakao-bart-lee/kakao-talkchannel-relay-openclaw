@@ -10,7 +10,7 @@ type InboundMessage struct {
 	AccountID         string               `db:"account_id" json:"accountId"`
 	ConversationKey   string               `db:"conversation_key" json:"conversationKey"`
 	KakaoPayload      json.RawMessage      `db:"kakao_payload" json:"kakaoPayload"`
-	NormalizedMessage json.RawMessage      `db:"normalized_message" json:"normalizedMessage,omitempty"`
+	NormalizedMessage *json.RawMessage     `db:"normalized_message" json:"normalizedMessage,omitempty"`
 	CallbackURL       *string              `db:"callback_url" json:"-"`
 	CallbackExpiresAt *time.Time           `db:"callback_expires_at" json:"-"`
 	Status            InboundMessageStatus `db:"status" json:"status"`

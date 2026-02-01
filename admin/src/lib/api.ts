@@ -72,8 +72,16 @@ export async function fetchApi<T>(
   }
 
   if (!res.ok) {
-    const data = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(data.error || res.statusText);
+    let errorMessage = 'An error occurred';
+    try {
+      const data = await res.json();
+      if (typeof data.error === 'string') {
+        errorMessage = data.error;
+      }
+    } catch {
+      // JSON 파싱 실패 시 기본 메시지 사용 (raw 텍스트 노출 방지)
+    }
+    throw new Error(errorMessage);
   }
 
   return res.json();

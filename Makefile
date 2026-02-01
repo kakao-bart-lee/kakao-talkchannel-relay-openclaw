@@ -24,8 +24,8 @@ up: docker-up ## Start all services (alias)
 down: docker-down ## Stop all services (alias)
 
 docker-up: ## Start PostgreSQL and Redis containers
-	docker compose up -d
-	@echo "$(GREEN)PostgreSQL and Redis started. Waiting for health checks...$(RESET)"
+	docker compose up -d --force-recreate
+	@echo "$(GREEN)Services started. Waiting for health checks...$(RESET)"
 	@sleep 2
 	@docker compose ps
 

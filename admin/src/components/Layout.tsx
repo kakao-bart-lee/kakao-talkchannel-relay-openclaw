@@ -24,8 +24,8 @@ export function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { href: '/', label: '대시보드', icon: LayoutDashboard },
-    { href: '/accounts', label: '계정 관리', icon: Building2 },
-    { href: '/users', label: '사용자 관리', icon: Users },
+    { href: '/accounts', label: 'API 계정', icon: Building2 },
+    { href: '/users', label: '포털 관리자', icon: Users },
     { href: '/mappings', label: '연결 관리', icon: LinkIcon },
     { href: '/messages', label: '메시지', icon: MessageSquare },
   ];

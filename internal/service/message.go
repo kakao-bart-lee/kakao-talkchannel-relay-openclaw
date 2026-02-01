@@ -121,11 +121,11 @@ type MessageHistoryResult struct {
 }
 
 type MessageHistoryItem struct {
-	ID              string          `json:"id"`
-	ConversationKey string          `json:"conversationKey"`
-	Direction       string          `json:"direction"`
-	Content         json.RawMessage `json:"content"`
-	CreatedAt       time.Time       `json:"createdAt"`
+	ID              string           `json:"id"`
+	ConversationKey string           `json:"conversationKey"`
+	Direction       string           `json:"direction"`
+	Content         *json.RawMessage `json:"content,omitempty"`
+	CreatedAt       time.Time        `json:"createdAt"`
 }
 
 func (s *MessageService) GetMessageHistory(ctx context.Context, params MessageHistoryParams) (*MessageHistoryResult, error) {
@@ -169,11 +169,12 @@ func (s *MessageService) GetMessageHistory(ctx context.Context, params MessageHi
 			return nil, fmt.Errorf("count outbound messages: %w", err)
 		}
 		for _, msg := range outboundMsgs {
+			payload := msg.ResponsePayload
 			messages = append(messages, MessageHistoryItem{
 				ID:              msg.ID,
 				ConversationKey: msg.ConversationKey,
 				Direction:       "outbound",
-				Content:         msg.ResponsePayload,
+				Content:         &payload,
 				CreatedAt:       msg.CreatedAt,
 			})
 		}
@@ -209,11 +210,12 @@ func (s *MessageService) GetMessageHistory(ctx context.Context, params MessageHi
 			})
 		}
 		for _, msg := range outboundMsgs {
+			payload := msg.ResponsePayload
 			messages = append(messages, MessageHistoryItem{
 				ID:              msg.ID,
 				ConversationKey: msg.ConversationKey,
 				Direction:       "outbound",
-				Content:         msg.ResponsePayload,
+				Content:         &payload,
 				CreatedAt:       msg.CreatedAt,
 			})
 		}
