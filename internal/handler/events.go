@@ -28,7 +28,21 @@ func NewEventsHandler(broker *sse.Broker, messageService *service.MessageService
 
 func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	account := middleware.GetAccount(r.Context())
-	if account == nil {
+	session := middleware.GetSession(r.Context())
+
+	// Determine subscription ID
+	var subscribeID string
+	var accountID string
+
+	if account != nil {
+		// Paired session or legacy account token
+		subscribeID = account.ID
+		accountID = account.ID
+	} else if session != nil {
+		// Pending session - subscribe by session ID for pairing events
+		subscribeID = "session:" + session.ID
+		accountID = ""
+	} else {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 		return
 	}
@@ -44,22 +58,37 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	client := h.broker.Subscribe(account.ID)
+	client := h.broker.Subscribe(subscribeID)
 	defer h.broker.Unsubscribe(client)
 
 	log.Info().
-		Str("accountId", account.ID).
+		Str("subscribeId", subscribeID).
+		Str("accountId", accountID).
 		Msg("sse connection established")
 
 	ctx := r.Context()
 
-	if err := h.sendQueuedMessages(w, flusher, account.ID); err != nil {
-		log.Error().Err(err).Msg("failed to send queued messages")
+	// Send queued messages only if we have an account
+	if accountID != "" {
+		if err := h.sendQueuedMessages(w, flusher, accountID); err != nil {
+			log.Error().Err(err).Msg("failed to send queued messages")
+		}
 	}
 
-	h.sendEvent(w, flusher, "connected", map[string]string{
-		"accountId": account.ID,
-		"message":   "SSE connection established",
+	h.sendEvent(w, flusher, "connected", map[string]any{
+		"accountId": accountID,
+		"sessionId": func() string {
+			if session != nil {
+				return session.ID
+			}
+			return ""
+		}(),
+		"status": func() string {
+			if session != nil {
+				return string(session.Status)
+			}
+			return "paired"
+		}(),
 	})
 
 	heartbeat := time.NewTicker(sse.HeartbeatInterval)
@@ -69,13 +98,13 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ctx.Done():
 			log.Info().
-				Str("accountId", account.ID).
+				Str("subscribeId", subscribeID).
 				Msg("sse connection closed by client")
 			return
 
 		case <-client.Done:
 			log.Info().
-				Str("accountId", account.ID).
+				Str("subscribeId", subscribeID).
 				Msg("sse connection closed by broker")
 			return
 
@@ -88,7 +117,7 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case <-heartbeat.C:
 			if _, err := fmt.Fprintf(w, ": ping\n\n"); err != nil {
 				log.Debug().
-					Str("accountId", account.ID).
+					Str("subscribeId", subscribeID).
 					Msg("heartbeat failed, closing connection")
 				return
 			}
