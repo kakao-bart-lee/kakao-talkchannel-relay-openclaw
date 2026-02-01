@@ -133,17 +133,9 @@ func (h *EventsHandler) sendQueuedMessages(w http.ResponseWriter, flusher http.F
 	}
 
 	for _, msg := range messages {
-		data, _ := json.Marshal(map[string]any{
-			"id":              msg.ID,
-			"conversationKey": msg.ConversationKey,
-			"kakaoPayload":    msg.KakaoPayload,
-			"normalized":      msg.NormalizedMessage,
-			"createdAt":       msg.CreatedAt,
-		})
-
 		event := sse.Event{
 			Type: "message",
-			Data: data,
+			Data: msg.ToSSEEventData(),
 		}
 
 		if err := h.sendRawEvent(w, flusher, event); err != nil {
