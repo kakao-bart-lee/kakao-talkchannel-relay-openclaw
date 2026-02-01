@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"os/signal"
@@ -65,6 +66,7 @@ func main() {
 	outboundMsgRepo := repository.NewOutboundMessageRepository(db.DB)
 	oauthAccountRepo := repository.NewOAuthAccountRepository(db.DB)
 	oauthStateRepo := repository.NewOAuthStateRepository(db.DB)
+	sessionRepo := repository.NewSessionRepository(db.DB)
 
 	broker := sse.NewBroker(redisClient)
 	defer broker.Close()
@@ -86,6 +88,7 @@ func main() {
 		cfg, portalUserRepo, oauthAccountRepo, oauthStateRepo,
 		portalSessionRepo, accountRepo, portalService,
 	)
+	sessionService := service.NewSessionService(sessionRepo, accountRepo, broker)
 
 	authMiddleware := middleware.NewAuthMiddleware(accountRepo)
 	rateLimitMiddleware := middleware.NewRateLimitMiddleware()
@@ -97,7 +100,7 @@ func main() {
 	isProduction := os.Getenv("FLY_APP_NAME") != ""
 
 	kakaoHandler := handler.NewKakaoHandler(
-		convService, pairingService, messageService, broker, cfg.CallbackTTL(),
+		convService, pairingService, sessionService, messageService, broker, cfg.CallbackTTL(),
 	)
 	eventsHandler := handler.NewEventsHandler(broker, messageService)
 	openclawHandler := handler.NewOpenClawHandler(
@@ -108,6 +111,7 @@ func main() {
 		portalService, pairingService, convService, messageService, isProduction,
 	)
 	oauthHandler := handler.NewOAuthHandler(oauthService, portalService, isProduction)
+	sessionHandler := handler.NewSessionHandler(sessionService)
 
 	r := chi.NewRouter()
 
@@ -118,8 +122,12 @@ func main() {
 	r.Use(chimiddleware.Timeout(60 * time.Second))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":    "ok",
+			"timestamp": time.Now().UnixMilli(),
+		})
 	})
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -131,12 +139,20 @@ func main() {
 		r.Post("/webhook", kakaoHandler.Webhook)
 	})
 
-	r.Route("/v1", func(r chi.Router) {
+	r.Route("/messages", func(r chi.Router) {
 		r.Use(authMiddleware.Handler)
 		r.Use(rateLimitMiddleware.Handler)
+		r.Get("/stream", eventsHandler.ServeHTTP)
+	})
 
-		r.Get("/events", eventsHandler.ServeHTTP)
+	r.Route("/openclaw", func(r chi.Router) {
+		r.Use(authMiddleware.Handler)
+		r.Use(rateLimitMiddleware.Handler)
 		r.Mount("/", openclawHandler.Routes())
+	})
+
+	r.Route("/v1/sessions", func(r chi.Router) {
+		r.Mount("/", sessionHandler.Routes())
 	})
 
 	r.Route("/admin", func(r chi.Router) {
@@ -152,7 +168,7 @@ func main() {
 
 	cleanupJob := jobs.NewCleanupJob(
 		adminSessionRepo, portalSessionRepo, pairingCodeRepo, inboundMsgRepo,
-		oauthStateRepo, 5*time.Minute,
+		oauthStateRepo, sessionRepo, 5*time.Minute,
 	)
 	cleanupJob.Start()
 	defer cleanupJob.Stop()
