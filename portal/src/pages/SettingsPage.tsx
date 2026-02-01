@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { AlertTriangle, Lock, Trash2 } from 'lucide-react';
+import { AlertTriangle, Link2, Trash2, Unlink } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { api, type User } from '../lib/api';
+import { api, type User, type OAuthProvider } from '../lib/api';
 
 interface LayoutContext {
   user: User | null;
@@ -39,127 +39,16 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Password Change */}
-      <PasswordChangeCard />
+      {/* Linked Accounts */}
+      <LinkedAccountsCard />
 
       {/* Account Deletion */}
-      <AccountDeletionCard onDeleted={() => navigate('/login')} />
+      <AccountDeletionCard onDeleted={() => navigate('/auth')} />
     </div>
   );
 }
 
-function PasswordChangeCard() {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(false);
-
-    if (newPassword !== confirmPassword) {
-      setError('새 비밀번호가 일치하지 않습니다.');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setError('비밀번호는 8자 이상이어야 합니다.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await api.changePassword({ currentPassword, newPassword });
-      setSuccess(true);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '비밀번호 변경에 실패했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Lock className="h-5 w-5" />
-          비밀번호 변경
-        </CardTitle>
-        <CardDescription>
-          계정 보안을 위해 주기적으로 비밀번호를 변경하세요.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="rounded-lg border border-green-500/50 bg-green-500/10 p-3 text-sm text-green-600">
-              비밀번호가 성공적으로 변경되었습니다.
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label htmlFor="currentPassword" className="text-sm font-medium">
-              현재 비밀번호
-            </label>
-            <Input
-              id="currentPassword"
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="newPassword" className="text-sm font-medium">
-              새 비밀번호
-            </label>
-            <Input
-              id="newPassword"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="8자 이상"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="confirmPassword" className="text-sm font-medium">
-              새 비밀번호 확인
-            </label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          <Button type="submit" disabled={loading}>
-            {loading ? '변경 중...' : '비밀번호 변경'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
-
 function AccountDeletionCard({ onDeleted }: { onDeleted: () => void }) {
-  const [password, setPassword] = useState('');
   const [confirmText, setConfirmText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,7 +65,7 @@ function AccountDeletionCard({ onDeleted }: { onDeleted: () => void }) {
 
     setLoading(true);
     try {
-      await api.deleteAccount(password);
+      await api.deleteAccount();
       onDeleted();
     } catch (err) {
       setError(err instanceof Error ? err.message : '계정 삭제에 실패했습니다.');
@@ -223,19 +112,6 @@ function AccountDeletionCard({ onDeleted }: { onDeleted: () => void }) {
             )}
 
             <div className="space-y-2">
-              <label htmlFor="deletePassword" className="text-sm font-medium">
-                비밀번호 확인
-              </label>
-              <Input
-                id="deletePassword"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
               <label htmlFor="confirmText" className="text-sm font-medium">
                 확인을 위해 <span className="font-bold">"계정 삭제"</span>를 입력하세요
               </label>
@@ -255,7 +131,6 @@ function AccountDeletionCard({ onDeleted }: { onDeleted: () => void }) {
                 variant="outline"
                 onClick={() => {
                   setShowForm(false);
-                  setPassword('');
                   setConfirmText('');
                   setError(null);
                 }}
@@ -272,6 +147,182 @@ function AccountDeletionCard({ onDeleted }: { onDeleted: () => void }) {
             </div>
           </form>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const providerNames: Record<string, string> = {
+  google: 'Google',
+  twitter: 'X (Twitter)',
+};
+
+const ProviderIcon = ({ provider }: { provider: string }) => {
+  if (provider === 'google') {
+    return (
+      <svg className="h-5 w-5" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+    );
+  }
+  if (provider === 'twitter') {
+    return (
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+    );
+  }
+  return null;
+};
+
+function LinkedAccountsCard() {
+  const [providers, setProviders] = useState<OAuthProvider[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadProviders();
+  }, []);
+
+  const loadProviders = async () => {
+    try {
+      const data = await api.getLinkedProviders();
+      setProviders(data.providers);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '연결된 계정을 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnlink = async (provider: string) => {
+    setError(null);
+    setUnlinkingProvider(provider);
+    try {
+      await api.unlinkProvider(provider);
+      setProviders(prev => prev.filter(p => p.provider !== provider));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '연결 해제에 실패했습니다.');
+    } finally {
+      setUnlinkingProvider(null);
+    }
+  };
+
+  const canUnlink = (provider: string) => {
+    const otherProviders = providers.filter(p => p.provider !== provider);
+    return otherProviders.length > 0;
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5" />
+            연결된 계정
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground">불러오는 중...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Link2 className="h-5 w-5" />
+          연결된 계정
+        </CardTitle>
+        <CardDescription>
+          소셜 로그인 연결을 관리합니다.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {error && (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        {providers.length === 0 ? (
+          <div className="text-sm text-muted-foreground">
+            연결된 소셜 계정이 없습니다.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {providers.map((provider) => (
+              <div
+                key={provider.provider}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <ProviderIcon provider={provider.provider} />
+                  <div>
+                    <div className="font-medium">{providerNames[provider.provider] || provider.provider}</div>
+                    {provider.email && (
+                      <div className="text-sm text-muted-foreground">{provider.email}</div>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleUnlink(provider.provider)}
+                  disabled={!canUnlink(provider.provider) || unlinkingProvider === provider.provider}
+                  title={!canUnlink(provider.provider) ? '마지막 인증 방법은 해제할 수 없습니다' : undefined}
+                >
+                  {unlinkingProvider === provider.provider ? (
+                    '해제 중...'
+                  ) : (
+                    <>
+                      <Unlink className="h-4 w-4 mr-1" />
+                      연결 해제
+                    </>
+                  )}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Link new provider */}
+        <div className="pt-4 border-t">
+          <div className="text-sm font-medium mb-3">계정 연결하기</div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.href = '/portal/api/oauth/google'}
+              disabled={providers.some(p => p.provider === 'google')}
+            >
+              <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Google
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.href = '/portal/api/oauth/twitter'}
+              disabled={providers.some(p => p.provider === 'twitter')}
+            >
+              <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+              X (Twitter)
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

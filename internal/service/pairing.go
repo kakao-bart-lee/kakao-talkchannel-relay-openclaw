@@ -74,9 +74,11 @@ func (s *PairingService) GenerateCode(
 		}
 	}
 
-	var metadataJSON json.RawMessage
+	var metadataJSON *json.RawMessage
 	if metadata != nil {
-		metadataJSON, _ = json.Marshal(metadata)
+		data, _ := json.Marshal(metadata)
+		raw := json.RawMessage(data)
+		metadataJSON = &raw
 	}
 
 	pc, err := s.codeRepo.Create(ctx, model.CreatePairingCodeParams{

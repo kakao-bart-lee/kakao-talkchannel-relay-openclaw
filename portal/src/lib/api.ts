@@ -1,7 +1,12 @@
 export interface User {
   id: string;
   email: string;
-  role: string;
+  accountId: string;
+  createdAt: string;
+}
+
+interface MeResponse {
+  user: User;
 }
 
 export interface Connection {
@@ -41,6 +46,16 @@ export interface MessagesResponse {
   messages: Message[];
   total: number;
   hasMore: boolean;
+}
+
+export interface OAuthProvider {
+  provider: string;
+  email: string | null;
+  linkedAt: string;
+}
+
+export interface OAuthProvidersResponse {
+  providers: OAuthProvider[];
 }
 
 interface RequestOptions extends RequestInit {
@@ -84,24 +99,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 }
 
 export const api = {
-  signup: (data: { email: string; password: string }) =>
-    request<User>('/portal/api/signup', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  login: (data: { email: string; password: string }) =>
-    request<User>('/portal/api/login', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
   logout: () =>
     request<void>('/portal/api/logout', {
       method: 'POST',
     }),
 
-  me: () => request<User | null>('/portal/api/me', { silent401: true }),
+  me: () => request<MeResponse | null>('/portal/api/me', { silent401: true }).then(res => res?.user ?? null),
 
   generatePairingCode: (expirySeconds?: number) =>
     request<PairingCode>('/portal/api/pairing/generate', {
@@ -109,7 +112,7 @@ export const api = {
       body: JSON.stringify({ expirySeconds }),
     }),
 
-getConnections: () => request<{ connections: Connection[]; total: number }>('/portal/api/connections'),
+  getConnections: () => request<{ connections: Connection[]; total: number }>('/portal/api/connections'),
 
   unpairConnection: (conversationKey: string) =>
     request<UnpairResponse>(`/portal/api/connections/${encodeURIComponent(conversationKey)}/unpair`, {
@@ -128,16 +131,10 @@ getConnections: () => request<{ connections: Connection[]; total: number }>('/po
       method: 'POST',
     }),
 
-  changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    request<void>('/portal/api/password', {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
-
-  deleteAccount: (password: string) =>
+  deleteAccount: () =>
     request<void>('/portal/api/account', {
       method: 'DELETE',
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ confirm: 'DELETE' }),
     }),
 
   getMessages: (params?: { type?: 'inbound' | 'outbound'; limit?: number; offset?: number }) => {
@@ -148,4 +145,13 @@ getConnections: () => request<{ connections: Connection[]; total: number }>('/po
     const query = searchParams.toString();
     return request<MessagesResponse>(`/portal/api/messages${query ? `?${query}` : ''}`);
   },
+
+  // OAuth endpoints
+  getLinkedProviders: () =>
+    request<OAuthProvidersResponse>('/portal/api/oauth/providers'),
+
+  unlinkProvider: (provider: string) =>
+    request<{ success: boolean }>(`/portal/api/oauth/unlink/${encodeURIComponent(provider)}`, {
+      method: 'DELETE',
+    }),
 };

@@ -85,7 +85,7 @@ export default function Layout(): React.ReactElement {
           {/* Logo */}
           <div className="flex items-center gap-6">
             <NavLink to="/" className="flex items-center gap-2 font-semibold">
-              <span className="text-lg">🔗 OpenClaw</span>
+              <span className="text-lg">Talk Channel x OpenClaw</span>
             </NavLink>
 
             {/* Navigation */}

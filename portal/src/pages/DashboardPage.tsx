@@ -1,20 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import { Unlink, ShieldBan, ShieldCheck, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { api, type User, type Connection } from '../lib/api';
-
-interface LayoutContext {
-  user: User | null;
-}
+import { api, type Connection } from '../lib/api';
 
 type FilterType = 'all' | 'paired' | 'blocked';
 
 export default function DashboardPage() {
-  const { user } = useOutletContext<LayoutContext>();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,7 +120,16 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold">대시보드</h1>
         <p className="text-muted-foreground">
-          {user?.email}님, 환영합니다.
+          대화를 위한 채널 연결:{' '}
+          <a
+            href="http://pf.kakao.com/_scexbC"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            http://pf.kakao.com/_scexbC
+          </a>
+          {' '}혹은 카카오톡에서 'samantha' 검색
         </p>
       </div>
 

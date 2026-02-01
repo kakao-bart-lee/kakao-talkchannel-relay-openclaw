@@ -14,6 +14,7 @@ type CleanupJob struct {
 	portalSessionRepo repository.PortalSessionRepository
 	pairingCodeRepo   repository.PairingCodeRepository
 	inboundMsgRepo    repository.InboundMessageRepository
+	oauthStateRepo    repository.OAuthStateRepository
 	interval          time.Duration
 	done              chan struct{}
 }
@@ -23,6 +24,7 @@ func NewCleanupJob(
 	portalSessionRepo repository.PortalSessionRepository,
 	pairingCodeRepo repository.PairingCodeRepository,
 	inboundMsgRepo repository.InboundMessageRepository,
+	oauthStateRepo repository.OAuthStateRepository,
 	interval time.Duration,
 ) *CleanupJob {
 	return &CleanupJob{
@@ -30,6 +32,7 @@ func NewCleanupJob(
 		portalSessionRepo: portalSessionRepo,
 		pairingCodeRepo:   pairingCodeRepo,
 		inboundMsgRepo:    inboundMsgRepo,
+		oauthStateRepo:    oauthStateRepo,
 		interval:          interval,
 		done:              make(chan struct{}),
 	}
@@ -69,6 +72,9 @@ func (j *CleanupJob) cleanup() {
 	j.runCleanup(ctx, "portal sessions", j.portalSessionRepo.DeleteExpired)
 	j.runCleanup(ctx, "pairing codes", j.pairingCodeRepo.DeleteExpired)
 	j.runCleanup(ctx, "inbound messages", j.inboundMsgRepo.MarkExpired)
+	if j.oauthStateRepo != nil {
+		j.runCleanup(ctx, "oauth states", j.oauthStateRepo.DeleteExpired)
+	}
 }
 
 func (j *CleanupJob) runCleanup(ctx context.Context, name string, fn func(context.Context) (int64, error)) {

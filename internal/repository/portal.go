@@ -16,7 +16,6 @@ type PortalUserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*model.PortalUser, error)
 	Create(ctx context.Context, params model.CreatePortalUserParams) (*model.PortalUser, error)
 	UpdateLastLogin(ctx context.Context, id string) error
-	UpdatePassword(ctx context.Context, id, passwordHash string) error
 	Delete(ctx context.Context, id string) error
 }
 
@@ -55,10 +54,10 @@ func (r *portalUserRepo) FindByEmail(ctx context.Context, email string) (*model.
 func (r *portalUserRepo) Create(ctx context.Context, params model.CreatePortalUserParams) (*model.PortalUser, error) {
 	var user model.PortalUser
 	err := r.db.GetContext(ctx, &user, `
-		INSERT INTO portal_users (email, password_hash, account_id)
-		VALUES ($1, $2, $3)
+		INSERT INTO portal_users (email, account_id)
+		VALUES ($1, $2)
 		RETURNING *
-	`, params.Email, params.PasswordHash, params.AccountID)
+	`, params.Email, params.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -69,13 +68,6 @@ func (r *portalUserRepo) UpdateLastLogin(ctx context.Context, id string) error {
 	_, err := r.db.ExecContext(ctx, `
 		UPDATE portal_users SET last_login_at = $2 WHERE id = $1
 	`, id, time.Now())
-	return err
-}
-
-func (r *portalUserRepo) UpdatePassword(ctx context.Context, id, passwordHash string) error {
-	_, err := r.db.ExecContext(ctx, `
-		UPDATE portal_users SET password_hash = $2 WHERE id = $1
-	`, id, passwordHash)
 	return err
 }
 

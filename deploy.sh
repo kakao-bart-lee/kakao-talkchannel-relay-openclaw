@@ -8,9 +8,21 @@ PROJECT_ID="${PROJECT_ID:-{PROJECT_ID}}"
 CLOUD_SQL_INSTANCE="{PROJECT_ID}:asia-northeast3:{INSTANCE_NAME}"
 VPC_CONNECTOR="{VPC_CONNECTOR}"
 
+# OAuth Redirect Base URL (defaults to {YOUR_DOMAIN})
+OAUTH_REDIRECT_BASE_URL="${OAUTH_REDIRECT_BASE_URL:-https://{YOUR_DOMAIN}}"
+
 echo "Deploying $SERVICE_NAME to Cloud Run..."
 echo "  Project: $PROJECT_ID"
 echo "  Region:  $REGION"
+echo "  OAuth URL: $OAUTH_REDIRECT_BASE_URL"
+
+# Build frontend assets
+echo ""
+echo "Building frontend assets..."
+bun run build:admin
+bun run build:portal
+echo "Frontend build complete."
+echo ""
 
 gcloud run deploy "$SERVICE_NAME" \
   --source . \
@@ -28,8 +40,17 @@ gcloud run deploy "$SERVICE_NAME" \
   --cpu-boost \
   --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
   --vpc-connector "$VPC_CONNECTOR" \
-  --set-env-vars "LOG_LEVEL=info,CALLBACK_TTL_SECONDS=55" \
-  --set-secrets "DATABASE_URL=kakao-relay-database-url:latest,REDIS_URL=kakao-relay-redis-url:latest,ADMIN_PASSWORD=kakao-relay-admin-password:latest,PORTAL_SESSION_SECRET=kakao-relay-session-secret:latest,ADMIN_SESSION_SECRET=kakao-relay-session-secret:latest"
+  --set-env-vars "LOG_LEVEL=info,CALLBACK_TTL_SECONDS=55,OAUTH_REDIRECT_BASE_URL=${OAUTH_REDIRECT_BASE_URL}" \
+  --set-secrets "DATABASE_URL=kakao-relay-database-url:latest,\
+REDIS_URL=kakao-relay-redis-url:latest,\
+ADMIN_PASSWORD=kakao-relay-admin-password:latest,\
+PORTAL_SESSION_SECRET=kakao-relay-session-secret:latest,\
+ADMIN_SESSION_SECRET=kakao-relay-admin-session-secret:latest,\
+GOOGLE_CLIENT_ID=kakao-relay-google-client-id:latest,\
+GOOGLE_CLIENT_SECRET=kakao-relay-google-client-secret:latest,\
+TWITTER_CLIENT_ID=kakao-relay-twitter-client-id:latest,\
+TWITTER_CLIENT_SECRET=kakao-relay-twitter-client-secret:latest,\
+OAUTH_STATE_SECRET=kakao-relay-oauth-state-secret:latest"
 
 echo ""
 echo "Deployment complete!"

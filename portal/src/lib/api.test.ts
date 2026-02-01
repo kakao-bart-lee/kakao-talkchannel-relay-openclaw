@@ -10,50 +10,6 @@ beforeEach(() => {
 });
 
 describe('Portal API', () => {
-  describe('signup', () => {
-    test('should call /portal/api/signup with correct data', async () => {
-      const mockUser = { id: '1', email: 'test@example.com', role: 'user' };
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify(mockUser), { status: 200 })
-      );
-
-      const result = await api.signup({ email: 'test@example.com', password: 'password123' });
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toBe('/portal/api/signup');
-      expect(options.method).toBe('POST');
-      expect(JSON.parse(options.body)).toEqual({ email: 'test@example.com', password: 'password123' });
-      expect(result).toEqual(mockUser);
-    });
-
-    test('should throw error on failure', async () => {
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ error: 'Email already exists' }), { status: 400 })
-      );
-
-      await expect(api.signup({ email: 'test@example.com', password: 'password123' }))
-        .rejects.toThrow('Email already exists');
-    });
-  });
-
-  describe('login', () => {
-    test('should call /portal/api/login with correct data', async () => {
-      const mockUser = { id: '1', email: 'test@example.com', role: 'user' };
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify(mockUser), { status: 200 })
-      );
-
-      const result = await api.login({ email: 'test@example.com', password: 'password123' });
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toBe('/portal/api/login');
-      expect(options.method).toBe('POST');
-      expect(result).toEqual(mockUser);
-    });
-  });
-
   describe('logout', () => {
     test('should call /portal/api/logout', async () => {
       mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
@@ -69,9 +25,9 @@ describe('Portal API', () => {
 
   describe('me', () => {
     test('should call /portal/api/me', async () => {
-      const mockUser = { id: '1', email: 'test@example.com', role: 'user' };
+      const mockUser = { id: '1', email: 'test@example.com', accountId: 'acc1', createdAt: '2024-01-01T00:00:00Z' };
       mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify(mockUser), { status: 200 })
+        new Response(JSON.stringify({ user: mockUser }), { status: 200 })
       );
 
       const result = await api.me();
@@ -124,9 +80,12 @@ describe('Portal API', () => {
 
   describe('getConnections', () => {
     test('should call /portal/api/connections', async () => {
-      const mockConnections = [
-        { conversationKey: 'conv1', state: 'paired', lastSeenAt: '2024-01-01T00:00:00Z' },
-      ];
+      const mockConnections = {
+        connections: [
+          { conversationKey: 'conv1', state: 'paired', lastSeenAt: '2024-01-01T00:00:00Z' },
+        ],
+        total: 1,
+      };
       mockFetch.mockResolvedValueOnce(
         new Response(JSON.stringify(mockConnections), { status: 200 })
       );
@@ -216,31 +175,17 @@ describe('Portal API', () => {
     });
   });
 
-  describe('changePassword', () => {
-    test('should call /portal/api/password', async () => {
-      mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
-
-      await api.changePassword({ currentPassword: 'old', newPassword: 'new' });
-
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toBe('/portal/api/password');
-      expect(options.method).toBe('PATCH');
-      expect(JSON.parse(options.body)).toEqual({ currentPassword: 'old', newPassword: 'new' });
-    });
-  });
-
   describe('deleteAccount', () => {
-    test('should call /portal/api/account', async () => {
+    test('should call /portal/api/account with confirm', async () => {
       mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
-      await api.deleteAccount('password123');
+      await api.deleteAccount();
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       const [url, options] = mockFetch.mock.calls[0];
       expect(url).toBe('/portal/api/account');
       expect(options.method).toBe('DELETE');
-      expect(JSON.parse(options.body)).toEqual({ password: 'password123' });
+      expect(JSON.parse(options.body)).toEqual({ confirm: 'DELETE' });
     });
   });
 
@@ -269,6 +214,36 @@ describe('Portal API', () => {
 
       const [url] = mockFetch.mock.calls[0];
       expect(url).toBe('/portal/api/messages?type=inbound&limit=10&offset=20');
+    });
+  });
+
+  describe('OAuth endpoints', () => {
+    test('getLinkedProviders should call /portal/api/oauth/providers', async () => {
+      const mockResponse = { providers: [{ provider: 'google', email: 'test@example.com', linkedAt: '2024-01-01' }] };
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(mockResponse), { status: 200 })
+      );
+
+      const result = await api.getLinkedProviders();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toBe('/portal/api/oauth/providers');
+      expect(result).toEqual(mockResponse);
+    });
+
+    test('unlinkProvider should call /portal/api/oauth/unlink/:provider', async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true }), { status: 200 })
+      );
+
+      const result = await api.unlinkProvider('google');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toBe('/portal/api/oauth/unlink/google');
+      expect(options.method).toBe('DELETE');
+      expect(result).toEqual({ success: true });
     });
   });
 });
