@@ -35,7 +35,7 @@ Authorization: Bearer <relay_token>
 카카오톡 채널 플랫폼이 호출하는 웹훅 엔드포인트.
 
 ```
-POST /kakao/webhook
+POST /kakao-talkchannel/webhook
 ```
 
 **Request Headers:**
@@ -445,7 +445,7 @@ interface PairingCode {
 
 | Endpoint | Limit | Window |
 |----------|-------|--------|
-| `POST /kakao/webhook` | 1000 req | per minute per channel |
+| `POST /kakao-talkchannel/webhook` | 1000 req | per minute per channel |
 | `GET /openclaw/messages` | 60 req | per minute per account |
 | `POST /openclaw/reply` | 120 req | per minute per account |
 | `POST /openclaw/pairing/generate` | 10 req | per minute per account |
