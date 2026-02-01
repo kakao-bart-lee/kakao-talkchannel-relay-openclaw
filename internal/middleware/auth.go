@@ -59,23 +59,6 @@ func (m *AuthMiddleware) Handler(next http.Handler) http.Handler {
 		tokenHash := util.HashToken(token)
 		ctx := r.Context()
 
-		// 1. Try account token first (legacy flow)
-		account, err := m.accountRepo.FindByTokenHash(ctx, tokenHash)
-		if err != nil {
-			log.Error().Err(err).Msg("auth middleware: database error")
-			writeJSON(w, http.StatusInternalServerError, map[string]string{
-				"error": "Authentication failed",
-			})
-			return
-		}
-
-		if account != nil {
-			ctx = context.WithValue(ctx, AccountContextKey, account)
-			next.ServeHTTP(w, r.WithContext(ctx))
-			return
-		}
-
-		// 2. Try session token (new session-based flow)
 		session, err := m.sessionRepo.FindByTokenHash(ctx, tokenHash)
 		if err != nil {
 			log.Error().Err(err).Msg("auth middleware: session lookup error")
@@ -93,7 +76,6 @@ func (m *AuthMiddleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
-		// Session found - add to context
 		ctx = context.WithValue(ctx, SessionContextKey, session)
 
 		// If session is paired, also add the linked account

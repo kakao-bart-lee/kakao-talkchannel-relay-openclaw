@@ -100,12 +100,10 @@ func main() {
 	isProduction := os.Getenv("FLY_APP_NAME") != ""
 
 	kakaoHandler := handler.NewKakaoHandler(
-		convService, pairingService, sessionService, messageService, broker, cfg.CallbackTTL(),
+		convService, sessionService, messageService, broker, cfg.CallbackTTL(),
 	)
 	eventsHandler := handler.NewEventsHandler(broker, messageService)
-	openclawHandler := handler.NewOpenClawHandler(
-		messageService, pairingService, convService, kakaoService,
-	)
+	openclawHandler := handler.NewOpenClawHandler(messageService, kakaoService)
 	adminHandler := handler.NewAdminHandler(adminService, adminSessionMiddleware.Handler, isProduction)
 	portalHandler := handler.NewPortalHandler(
 		portalService, pairingService, convService, messageService, isProduction,
