@@ -5,18 +5,16 @@ import (
 )
 
 type PortalUser struct {
-	ID           string     `db:"id" json:"id"`
-	Email        string     `db:"email" json:"email"`
-	PasswordHash string     `db:"password_hash" json:"-"`
-	AccountID    string     `db:"account_id" json:"accountId"`
-	CreatedAt    time.Time  `db:"created_at" json:"createdAt"`
-	LastLoginAt  *time.Time `db:"last_login_at" json:"lastLoginAt,omitempty"`
+	ID          string     `db:"id" json:"id"`
+	Email       string     `db:"email" json:"email"`
+	AccountID   string     `db:"account_id" json:"accountId"`
+	CreatedAt   time.Time  `db:"created_at" json:"createdAt"`
+	LastLoginAt *time.Time `db:"last_login_at" json:"lastLoginAt,omitempty"`
 }
 
 type CreatePortalUserParams struct {
-	Email        string
-	PasswordHash string
-	AccountID    string
+	Email     string
+	AccountID string
 }
 
 type PortalSession struct {

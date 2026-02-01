@@ -63,6 +63,8 @@ func main() {
 	adminSessionRepo := repository.NewAdminSessionRepository(db.DB)
 	inboundMsgRepo := repository.NewInboundMessageRepository(db.DB)
 	outboundMsgRepo := repository.NewOutboundMessageRepository(db.DB)
+	oauthAccountRepo := repository.NewOAuthAccountRepository(db.DB)
+	oauthStateRepo := repository.NewOAuthStateRepository(db.DB)
 
 	broker := sse.NewBroker(redisClient)
 	defer broker.Close()
@@ -79,6 +81,10 @@ func main() {
 	portalService := service.NewPortalService(
 		portalUserRepo, portalSessionRepo, accountRepo,
 		cfg.PortalSessionSecret,
+	)
+	oauthService := service.NewOAuthService(
+		cfg, portalUserRepo, oauthAccountRepo, oauthStateRepo,
+		portalSessionRepo, accountRepo, portalService,
 	)
 
 	authMiddleware := middleware.NewAuthMiddleware(accountRepo)
@@ -101,6 +107,7 @@ func main() {
 	portalHandler := handler.NewPortalHandler(
 		portalService, pairingService, convService, messageService, isProduction,
 	)
+	oauthHandler := handler.NewOAuthHandler(oauthService, portalService, isProduction)
 
 	r := chi.NewRouter()
 
@@ -116,7 +123,7 @@ func main() {
 	})
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/portal", http.StatusFound)
+		http.Redirect(w, r, "/portal/", http.StatusFound)
 	})
 
 	r.Route("/kakao-talkchannel", func(r chi.Router) {
@@ -139,12 +146,13 @@ func main() {
 
 	r.Route("/portal", func(r chi.Router) {
 		r.Mount("/", portalHandler.Routes())
+		r.Mount("/api/oauth", oauthHandler.Routes())
 		r.NotFound(handler.StaticFileServer("static/portal", "/portal").ServeHTTP)
 	})
 
 	cleanupJob := jobs.NewCleanupJob(
 		adminSessionRepo, portalSessionRepo, pairingCodeRepo, inboundMsgRepo,
-		5*time.Minute,
+		oauthStateRepo, 5*time.Minute,
 	)
 	cleanupJob.Start()
 	defer cleanupJob.Stop()

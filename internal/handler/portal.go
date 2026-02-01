@@ -40,8 +40,6 @@ func NewPortalHandler(
 func (h *PortalHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 
-	r.Post("/api/signup", h.Signup)
-	r.Post("/api/login", h.Login)
 	r.Post("/api/logout", h.Logout)
 	r.Get("/api/me", h.Me)
 	r.Post("/api/pairing/generate", h.GeneratePairingCode)
@@ -50,83 +48,10 @@ func (h *PortalHandler) Routes() chi.Router {
 	r.Patch("/api/connections/{conversationKey}/block", h.BlockConnection)
 	r.Get("/api/token", h.GetToken)
 	r.Post("/api/token/regenerate", h.RegenerateToken)
-	r.Patch("/api/password", h.ChangePassword)
 	r.Delete("/api/account", h.DeleteAccount)
 	r.Get("/api/messages", h.GetMessages)
 
 	return r
-}
-
-func (h *PortalHandler) Signup(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
-		return
-	}
-
-	if req.Email == "" || req.Password == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Email and password are required"})
-		return
-	}
-
-	if len(req.Password) < 6 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Password must be at least 6 characters"})
-		return
-	}
-
-	user, token, err := h.portalService.Signup(r.Context(), req.Email, req.Password)
-	if err != nil {
-		if err == service.ErrEmailExists {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "Email already exists"})
-			return
-		}
-		log.Error().Err(err).Msg("signup failed")
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Signup failed"})
-		return
-	}
-
-	middleware.SetSessionCookie(w, middleware.PortalSessionCookie, token, "/portal", h.isProduction)
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"success": true,
-		"user": map[string]string{
-			"id":    user.ID,
-			"email": user.Email,
-		},
-	})
-}
-
-func (h *PortalHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
-		return
-	}
-
-	user, token, err := h.portalService.Login(r.Context(), req.Email, req.Password)
-	if err != nil {
-		if err == service.ErrInvalidCredentials {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Invalid email or password"})
-			return
-		}
-		log.Error().Err(err).Msg("login failed")
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Login failed"})
-		return
-	}
-
-	middleware.SetSessionCookie(w, middleware.PortalSessionCookie, token, "/portal", h.isProduction)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"success": true,
-		"user": map[string]string{
-			"id":    user.ID,
-			"email": user.Email,
-		},
-	})
 }
 
 func (h *PortalHandler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -344,45 +269,6 @@ func (h *PortalHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (h *PortalHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
-	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
-		return
-	}
-
-	var req struct {
-		CurrentPassword string `json:"currentPassword"`
-		NewPassword     string `json:"newPassword"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
-		return
-	}
-
-	if req.CurrentPassword == "" || req.NewPassword == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Current and new password are required"})
-		return
-	}
-
-	if len(req.NewPassword) < 6 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "New password must be at least 6 characters"})
-		return
-	}
-
-	if err := h.portalService.ChangePassword(r.Context(), user.ID, req.CurrentPassword, req.NewPassword); err != nil {
-		if err == service.ErrInvalidCredentials {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Current password is incorrect"})
-			return
-		}
-		log.Error().Err(err).Msg("failed to change password")
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to change password"})
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
 func (h *PortalHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	user := h.getSessionUser(r)
 	if user == nil {
@@ -391,23 +277,19 @@ func (h *PortalHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Password string `json:"password"`
+		Confirm string `json:"confirm"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 		return
 	}
 
-	if req.Password == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Password is required"})
+	if req.Confirm != "DELETE" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Please confirm deletion by sending {\"confirm\": \"DELETE\"}"})
 		return
 	}
 
-	if err := h.portalService.DeleteAccount(r.Context(), user.ID, req.Password); err != nil {
-		if err == service.ErrInvalidCredentials {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Password is incorrect"})
-			return
-		}
+	if err := h.portalService.DeleteAccount(r.Context(), user.ID); err != nil {
 		log.Error().Err(err).Msg("failed to delete account")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete account"})
 		return
@@ -456,8 +338,13 @@ func (h *PortalHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	messages := result.Messages
+	if messages == nil {
+		messages = []service.MessageHistoryItem{}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"messages": result.Messages,
+		"messages": messages,
 		"total":    result.Total,
 		"hasMore":  result.HasMore,
 	})

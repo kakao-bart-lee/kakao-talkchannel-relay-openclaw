@@ -126,9 +126,29 @@ func (m *mockInboundMsgRepo) CountByAccountID(ctx context.Context, accountID str
 	return 0, nil
 }
 
+type mockOAuthStateRepo struct {
+	deleteExpiredCount int64
+}
+
+func (m *mockOAuthStateRepo) FindByState(ctx context.Context, state string) (*model.OAuthState, error) {
+	return nil, nil
+}
+
+func (m *mockOAuthStateRepo) Create(ctx context.Context, params model.CreateOAuthStateParams) (*model.OAuthState, error) {
+	return nil, nil
+}
+
+func (m *mockOAuthStateRepo) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *mockOAuthStateRepo) DeleteExpired(ctx context.Context) (int64, error) {
+	return m.deleteExpiredCount, nil
+}
+
 func TestCleanupJob(t *testing.T) {
 	t.Run("creates job with correct interval", func(t *testing.T) {
-		job := NewCleanupJob(nil, nil, nil, nil, 5*time.Minute)
+		job := NewCleanupJob(nil, nil, nil, nil, nil, 5*time.Minute)
 
 		assert.NotNil(t, job)
 		assert.Equal(t, 5*time.Minute, job.interval)
@@ -139,8 +159,9 @@ func TestCleanupJob(t *testing.T) {
 		portalRepo := &mockPortalSessionRepo{}
 		pairingRepo := &mockPairingCodeRepo{}
 		msgRepo := &mockInboundMsgRepo{}
+		oauthStateRepo := &mockOAuthStateRepo{}
 
-		job := NewCleanupJob(adminRepo, portalRepo, pairingRepo, msgRepo, 100*time.Millisecond)
+		job := NewCleanupJob(adminRepo, portalRepo, pairingRepo, msgRepo, oauthStateRepo, 100*time.Millisecond)
 
 		job.Start()
 		time.Sleep(50 * time.Millisecond)
@@ -152,8 +173,9 @@ func TestCleanupJob(t *testing.T) {
 		portalRepo := &mockPortalSessionRepo{deleteExpiredCount: 3}
 		pairingRepo := &mockPairingCodeRepo{deleteExpiredCount: 1}
 		msgRepo := &mockInboundMsgRepo{markExpiredCount: 5}
+		oauthStateRepo := &mockOAuthStateRepo{deleteExpiredCount: 4}
 
-		job := NewCleanupJob(adminRepo, portalRepo, pairingRepo, msgRepo, 1*time.Hour)
+		job := NewCleanupJob(adminRepo, portalRepo, pairingRepo, msgRepo, oauthStateRepo, 1*time.Hour)
 
 		job.Start()
 		time.Sleep(10 * time.Millisecond)
