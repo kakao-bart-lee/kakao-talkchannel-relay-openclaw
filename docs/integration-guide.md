@@ -64,7 +64,7 @@ curl -X POST https://kakao-talkchannel-relay-....run.app/admin/api/accounts \
 1. 채널 설정 → 챗봇 → 스킬 설정
 2. 웹훅 URL 등록:
    ```
-   https://kakao-talkchannel-relay-{PROJECT_NUMBER}.asia-northeast3.run.app/kakao/webhook
+   https://kakao-talkchannel-relay-{PROJECT_NUMBER}.asia-northeast3.run.app/kakao-talkchannel/webhook
    ```
 3. (선택) 서명 검증 활성화 시 `KAKAO_SIGNATURE_SECRET` 환경변수 설정
 
@@ -141,7 +141,7 @@ curl -X POST https://...run.app/openclaw/pairing/generate \
 ```
 사용자 → 카카오: "안녕하세요"
     ↓
-카카오 → 릴레이: POST /kakao/webhook
+카카오 → 릴레이: POST /kakao-talkchannel/webhook
     ↓
 릴레이: inbound_messages 테이블에 저장 (status: queued)
     ↓
