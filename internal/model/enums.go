@@ -32,3 +32,12 @@ const (
 	OutboundStatusSent    OutboundMessageStatus = "sent"
 	OutboundStatusFailed  OutboundMessageStatus = "failed"
 )
+
+type SessionStatus string
+
+const (
+	SessionStatusPendingPairing SessionStatus = "pending_pairing"
+	SessionStatusPaired         SessionStatus = "paired"
+	SessionStatusExpired        SessionStatus = "expired"
+	SessionStatusDisconnected   SessionStatus = "disconnected"
+)

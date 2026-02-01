@@ -46,6 +46,7 @@ func parseCommand(utterance string) *Command {
 type KakaoHandler struct {
 	convService    *service.ConversationService
 	pairingService *service.PairingService
+	sessionService *service.SessionService
 	messageService *service.MessageService
 	broker         *sse.Broker
 	callbackTTL    time.Duration
@@ -54,6 +55,7 @@ type KakaoHandler struct {
 func NewKakaoHandler(
 	convService *service.ConversationService,
 	pairingService *service.PairingService,
+	sessionService *service.SessionService,
 	messageService *service.MessageService,
 	broker *sse.Broker,
 	callbackTTL time.Duration,
@@ -61,6 +63,7 @@ func NewKakaoHandler(
 	return &KakaoHandler{
 		convService:    convService,
 		pairingService: pairingService,
+		sessionService: sessionService,
 		messageService: messageService,
 		broker:         broker,
 		callbackTTL:    callbackTTL,
@@ -176,6 +179,26 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 			)
 		}
 
+		// First try session pairing (auto-created sessions from plugin)
+		sessionResult := h.sessionService.VerifyPairingCode(ctx, cmd.Code, conversationKey)
+		if sessionResult.Success {
+			// Update conversation state
+			if err := h.convService.UpdateState(ctx, conversationKey, model.PairingStatePaired, &sessionResult.AccountID); err != nil {
+				log.Error().Err(err).Msg("failed to update conversation state after session pairing")
+			}
+
+			// Publish pairing_complete event
+			session, err := h.sessionService.FindByID(ctx, sessionResult.SessionID)
+			if err == nil && session != nil {
+				if err := h.sessionService.PublishPairingComplete(ctx, session, conversationKey); err != nil {
+					log.Warn().Err(err).Msg("failed to publish pairing_complete event")
+				}
+			}
+
+			return NewTextResponse("✅ OpenClaw에 연결되었습니다!\n\n이제 자유롭게 대화를 시작하세요.")
+		}
+
+		// Fall back to traditional pairing code (portal-generated)
 		result := h.pairingService.VerifyCode(ctx, cmd.Code, conversationKey)
 		if !result.Success {
 			errorMessages := map[string]string{

@@ -46,7 +46,8 @@ func (h *OpenClawHandler) Routes() chi.Router {
 	return r
 }
 
-// POST /v1/reply
+// POST /openclaw/reply
+// Core API: Send reply to Kakao user.
 func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 	account := middleware.GetAccount(r.Context())
 	if account == nil {
@@ -127,6 +128,8 @@ func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 
 	h.messageService.MarkOutboundSent(ctx, outbound.ID)
 
+	deliveredAt := time.Now().UnixMilli()
+
 	log.Info().
 		Str("outboundId", outbound.ID).
 		Str("messageId", req.MessageID).
@@ -134,13 +137,16 @@ func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 		Msg("reply sent to Kakao")
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"success":           true,
-		"outboundMessageId": outbound.ID,
-		"callbackSent":      true,
+		"success":     true,
+		"deliveredAt": deliveredAt,
 	})
 }
 
-// POST /v1/pairing/generate
+// POST /openclaw/pairing/generate
+//
+// Deprecated: Use POST /v1/sessions/create instead.
+// This endpoint requires manual token management via Portal.
+// The new session-based flow auto-generates pairing codes without Portal login.
 func (h *OpenClawHandler) GeneratePairingCode(w http.ResponseWriter, r *http.Request) {
 	account := middleware.GetAccount(r.Context())
 	if account == nil {
@@ -169,7 +175,10 @@ func (h *OpenClawHandler) GeneratePairingCode(w http.ResponseWriter, r *http.Req
 	})
 }
 
-// GET /v1/pairing/list
+// GET /openclaw/pairing/list
+//
+// Deprecated: With session-based flow, pairing is automatic and 1:1.
+// Use GET /v1/sessions/{token}/status to check connection status instead.
 func (h *OpenClawHandler) ListPairedConversations(w http.ResponseWriter, r *http.Request) {
 	account := middleware.GetAccount(r.Context())
 	if account == nil {
@@ -197,7 +206,10 @@ func (h *OpenClawHandler) ListPairedConversations(w http.ResponseWriter, r *http
 	})
 }
 
-// POST /v1/pairing/unpair
+// POST /openclaw/pairing/unpair
+//
+// Deprecated: Users can unpair by typing /unpair in Kakao chat.
+// This API-based unpair is only needed for programmatic control.
 func (h *OpenClawHandler) Unpair(w http.ResponseWriter, r *http.Request) {
 	account := middleware.GetAccount(r.Context())
 	if account == nil {
@@ -229,7 +241,10 @@ func (h *OpenClawHandler) Unpair(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
-// POST /v1/messages/ack
+// POST /openclaw/messages/ack
+//
+// Deprecated: Message acknowledgment is optional and rarely needed.
+// Messages are auto-marked as delivered when sent via SSE.
 func (h *OpenClawHandler) AckMessages(w http.ResponseWriter, r *http.Request) {
 	account := middleware.GetAccount(r.Context())
 	if account == nil {
