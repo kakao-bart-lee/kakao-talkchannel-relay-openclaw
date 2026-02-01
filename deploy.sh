@@ -7,6 +7,7 @@ REGION="asia-northeast3"
 PROJECT_ID="${PROJECT_ID:-{PROJECT_ID}}"
 CLOUD_SQL_INSTANCE="{PROJECT_ID}:asia-northeast3:{INSTANCE_NAME}"
 VPC_CONNECTOR="{VPC_CONNECTOR}"
+IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${SERVICE_NAME}"
 
 # OAuth Redirect Base URL (defaults to {YOUR_DOMAIN})
 OAUTH_REDIRECT_BASE_URL="${OAUTH_REDIRECT_BASE_URL:-https://{YOUR_DOMAIN}}"
@@ -24,8 +25,16 @@ bun run build:portal
 echo "Frontend build complete."
 echo ""
 
+# Step 1: Build and push image (no cache issues)
+echo "Building Docker image..."
+gcloud builds submit --tag "${IMAGE_NAME}:latest" --project "$PROJECT_ID" .
+echo "Image build complete."
+echo ""
+
+# Step 2: Deploy to Cloud Run
+echo "Deploying to Cloud Run..."
 gcloud run deploy "$SERVICE_NAME" \
-  --source . \
+  --image "${IMAGE_NAME}:latest" \
   --project "$PROJECT_ID" \
   --region "$REGION" \
   --platform managed \
