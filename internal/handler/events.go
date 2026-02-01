@@ -133,9 +133,15 @@ func (h *EventsHandler) sendQueuedMessages(w http.ResponseWriter, flusher http.F
 	}
 
 	for _, msg := range messages {
+		sseData := msg.ToSSEEventData()
+		log.Debug().
+			Str("messageId", msg.ID).
+			RawJSON("sseEventData", sseData).
+			Msg("sending queued sse message event")
+
 		event := sse.Event{
 			Type: "message",
-			Data: msg.ToSSEEventData(),
+			Data: sseData,
 		}
 
 		if err := h.sendRawEvent(w, flusher, event); err != nil {
