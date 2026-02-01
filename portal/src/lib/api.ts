@@ -43,23 +43,36 @@ export interface MessagesResponse {
   hasMore: boolean;
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+interface RequestOptions extends RequestInit {
+  silent401?: boolean;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { silent401, ...fetchOptions } = options;
+
   const res = await fetch(path, {
-    ...options,
+    ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...fetchOptions.headers,
     },
   });
 
   if (!res.ok) {
-    const error = await res.text();
-    try {
-      const json = JSON.parse(error);
-      throw new Error(json.error || json.message || 'An error occurred');
-    } catch (e) {
-      throw new Error(error || 'An error occurred');
+    // 인증 확인 요청에서 401은 예상된 상황이므로 조용히 null 반환
+    if (silent401 && res.status === 401) {
+      return null as T;
     }
+
+    let errorMessage = 'An error occurred';
+    try {
+      const text = await res.text();
+      const json = JSON.parse(text);
+      errorMessage = json.error || json.message || errorMessage;
+    } catch {
+      // JSON 파싱 실패 시 기본 메시지 사용 (raw 텍스트 노출 방지)
+    }
+    throw new Error(errorMessage);
   }
 
   // Handle 204 No Content
@@ -88,7 +101,7 @@ export const api = {
       method: 'POST',
     }),
 
-  me: () => request<User>('/portal/api/me'),
+  me: () => request<User | null>('/portal/api/me', { silent401: true }),
 
   generatePairingCode: (expirySeconds?: number) =>
     request<PairingCode>('/portal/api/pairing/generate', {
