@@ -136,7 +136,8 @@ func (h *EventsHandler) sendQueuedMessages(w http.ResponseWriter, flusher http.F
 		data, _ := json.Marshal(map[string]any{
 			"id":              msg.ID,
 			"conversationKey": msg.ConversationKey,
-			"message":         msg.NormalizedMessage,
+			"kakaoPayload":    msg.KakaoPayload,
+			"normalized":      msg.NormalizedMessage,
 			"createdAt":       msg.CreatedAt,
 		})
 
