@@ -143,17 +143,9 @@ func (h *KakaoHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	eventData, _ := json.Marshal(map[string]any{
-		"id":              msg.ID,
-		"conversationKey": conversationKey,
-		"kakaoPayload":    json.RawMessage(req.ToJSON()),
-		"normalized":      json.RawMessage(normalizedMsg),
-		"createdAt":       msg.CreatedAt,
-	})
-
 	if err := h.broker.Publish(ctx, *conv.AccountID, sse.Event{
 		Type: "message",
-		Data: eventData,
+		Data: msg.ToSSEEventData(),
 	}); err != nil {
 		log.Warn().Err(err).Msg("failed to publish message event")
 	}

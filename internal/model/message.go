@@ -20,6 +20,18 @@ type InboundMessage struct {
 	AckedAt           *time.Time           `db:"acked_at" json:"ackedAt,omitempty"`
 }
 
+// ToSSEEventData returns JSON data for SSE message events
+func (m *InboundMessage) ToSSEEventData() json.RawMessage {
+	data, _ := json.Marshal(map[string]any{
+		"id":              m.ID,
+		"conversationKey": m.ConversationKey,
+		"kakaoPayload":    m.KakaoPayload,
+		"normalized":      m.NormalizedMessage,
+		"createdAt":       m.CreatedAt,
+	})
+	return data
+}
+
 type CreateInboundMessageParams struct {
 	AccountID         string
 	ConversationKey   string
