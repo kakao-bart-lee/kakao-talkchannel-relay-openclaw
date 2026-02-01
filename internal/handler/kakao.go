@@ -45,7 +45,6 @@ func parseCommand(utterance string) *Command {
 
 type KakaoHandler struct {
 	convService    *service.ConversationService
-	pairingService *service.PairingService
 	sessionService *service.SessionService
 	messageService *service.MessageService
 	broker         *sse.Broker
@@ -54,7 +53,6 @@ type KakaoHandler struct {
 
 func NewKakaoHandler(
 	convService *service.ConversationService,
-	pairingService *service.PairingService,
 	sessionService *service.SessionService,
 	messageService *service.MessageService,
 	broker *sse.Broker,
@@ -62,7 +60,6 @@ func NewKakaoHandler(
 ) *KakaoHandler {
 	return &KakaoHandler{
 		convService:    convService,
-		pairingService: pairingService,
 		sessionService: sessionService,
 		messageService: messageService,
 		broker:         broker,
@@ -118,7 +115,7 @@ func (h *KakaoHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	if conv.State != model.PairingStatePaired || conv.AccountID == nil {
 		writeJSON(w, http.StatusOK, NewTextResponse(
 			"OpenClaw에 연결되지 않았습니다.\n\n"+
-				"연결하려면 봇 관리자에게 페어링 코드를 요청한 후:\n"+
+				"연결하려면 페어링 코드를 받은 후:\n"+
 				"/pair <코드>\n\n"+
 				"를 입력해주세요.\n\n"+
 				"도움말: /help",
@@ -179,38 +176,30 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 			)
 		}
 
-		// First try session pairing (auto-created sessions from plugin)
-		sessionResult := h.sessionService.VerifyPairingCode(ctx, cmd.Code, conversationKey)
-		if sessionResult.Success {
-			// Update conversation state
-			if err := h.convService.UpdateState(ctx, conversationKey, model.PairingStatePaired, &sessionResult.AccountID); err != nil {
-				log.Error().Err(err).Msg("failed to update conversation state after session pairing")
-			}
-
-			// Publish pairing_complete event
-			session, err := h.sessionService.FindByID(ctx, sessionResult.SessionID)
-			if err == nil && session != nil {
-				if err := h.sessionService.PublishPairingComplete(ctx, session, conversationKey); err != nil {
-					log.Warn().Err(err).Msg("failed to publish pairing_complete event")
-				}
-			}
-
-			return NewTextResponse("✅ OpenClaw에 연결되었습니다!\n\n이제 자유롭게 대화를 시작하세요.")
-		}
-
-		// Fall back to traditional pairing code (portal-generated)
-		result := h.pairingService.VerifyCode(ctx, cmd.Code, conversationKey)
+		result := h.sessionService.VerifyPairingCode(ctx, cmd.Code, conversationKey)
 		if !result.Success {
 			errorMessages := map[string]string{
-				"INVALID_CODE": "❌ 유효하지 않은 코드입니다.\n\n코드를 다시 확인하거나 관리자에게 새 코드를 요청하세요.",
-				"EXPIRED_CODE": "⏰ 코드가 만료되었습니다.\n\n관리자에게 새 코드를 요청하세요.",
-				"ALREADY_USED": "❌ 이미 사용된 코드입니다.\n\n관리자에게 새 코드를 요청하세요.",
+				"INVALID_CODE":   "❌ 유효하지 않은 코드입니다.\n\n코드를 다시 확인해주세요.",
+				"INTERNAL_ERROR": "❌ 오류가 발생했습니다. 다시 시도해주세요.",
 			}
 			msg := errorMessages[result.Error]
 			if msg == "" {
 				msg = "페어링에 실패했습니다."
 			}
 			return NewTextResponse(msg)
+		}
+
+		// Update conversation state
+		if err := h.convService.UpdateState(ctx, conversationKey, model.PairingStatePaired, &result.AccountID); err != nil {
+			log.Error().Err(err).Msg("failed to update conversation state after session pairing")
+		}
+
+		// Publish pairing_complete event
+		session, err := h.sessionService.FindByID(ctx, result.SessionID)
+		if err == nil && session != nil {
+			if err := h.sessionService.PublishPairingComplete(ctx, session, conversationKey); err != nil {
+				log.Warn().Err(err).Msg("failed to publish pairing_complete event")
+			}
 		}
 
 		return NewTextResponse("✅ OpenClaw에 연결되었습니다!\n\n이제 자유롭게 대화를 시작하세요.")
@@ -220,7 +209,7 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 			return NewTextResponse("연결된 OpenClaw가 없습니다.")
 		}
 
-		if err := h.pairingService.Unpair(ctx, conversationKey); err != nil {
+		if err := h.convService.UpdateState(ctx, conversationKey, model.PairingStateUnpaired, nil); err != nil {
 			log.Error().Err(err).Msg("failed to unpair")
 			return NewTextResponse("연결 해제에 실패했습니다. 다시 시도해주세요.")
 		}
@@ -245,8 +234,7 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 				"• /pair <코드> - OpenClaw에 연결\n" +
 				"• /unpair - 연결 해제\n" +
 				"• /status - 연결 상태 확인\n" +
-				"• /help - 이 도움말\n\n" +
-				"페어링 코드는 OpenClaw 관리자에게 요청하세요.",
+				"• /help - 이 도움말",
 		)
 
 	default:
