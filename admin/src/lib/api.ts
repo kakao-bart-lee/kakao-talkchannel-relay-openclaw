@@ -54,6 +54,18 @@ export interface PortalUser {
   isActive: boolean;
 }
 
+export interface PluginSession {
+  id: string;
+  pairingCode: string;
+  status: 'pending_pairing' | 'paired' | 'expired' | 'disconnected';
+  accountId: string | null;
+  pairedConversationKey: string | null;
+  pairedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -99,10 +111,11 @@ export const api = {
       method: 'POST',
     }),
 
-  getStats: () => 
+  getStats: () =>
     fetchApi<{
       accounts: number;
       mappings: number;
+      sessions: { pending: number; paired: number; total: number };
       messages: {
         inbound: { today: number; week: number; queued: number };
         outbound: { today: number; week: number; failed: number };
@@ -179,5 +192,22 @@ export const api = {
   deleteUser: (id: string) =>
     fetchApi<{ success: true }>(`/admin/api/users/${id}`, {
       method: 'DELETE',
+    }),
+
+  // Sessions (Plugin Sessions)
+  getSessions: (limit = 50, offset = 0, status?: string) => {
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    if (status) params.append('status', status);
+    return fetchApi<{ items: PluginSession[]; total: number }>(`/admin/api/sessions?${params}`);
+  },
+
+  deleteSession: (id: string) =>
+    fetchApi<{ success: true }>(`/admin/api/sessions/${id}`, {
+      method: 'DELETE',
+    }),
+
+  disconnectSession: (id: string) =>
+    fetchApi<{ success: true }>(`/admin/api/sessions/${id}/disconnect`, {
+      method: 'POST',
     }),
 };

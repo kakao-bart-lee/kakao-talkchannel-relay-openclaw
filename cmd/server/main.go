@@ -77,7 +77,7 @@ func main() {
 	kakaoService := service.NewKakaoService()
 	adminService := service.NewAdminService(
 		db.DB, adminSessionRepo, accountRepo, convRepo,
-		inboundMsgRepo, outboundMsgRepo, portalUserRepo,
+		inboundMsgRepo, outboundMsgRepo, portalUserRepo, sessionRepo,
 		cfg.AdminPassword, cfg.AdminSessionSecret,
 	)
 	portalService := service.NewPortalService(

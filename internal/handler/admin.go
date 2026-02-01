@@ -61,6 +61,11 @@ func (h *AdminHandler) Routes() chi.Router {
 		r.Get("/api/users/{id}", h.GetUser)
 		r.Patch("/api/users/{id}", h.UpdateUser)
 		r.Delete("/api/users/{id}", h.DeleteUser)
+
+		// Sessions (Plugin Sessions)
+		r.Get("/api/sessions", h.ListSessions)
+		r.Delete("/api/sessions/{id}", h.DeleteSession)
+		r.Post("/api/sessions/{id}/disconnect", h.DisconnectSession)
 	})
 
 	return r
@@ -367,6 +372,54 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.adminService.DeleteUser(r.Context(), id); err != nil {
 		log.Error().Err(err).Msg("failed to delete user")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// Sessions (Plugin Sessions)
+
+func (h *AdminHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	status := r.URL.Query().Get("status")
+
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	sessions, total, err := h.adminService.GetSessions(r.Context(), limit, offset, status)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list sessions")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": sessions,
+		"total": total,
+	})
+}
+
+func (h *AdminHandler) DeleteSession(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	if err := h.adminService.DeleteSession(r.Context(), id); err != nil {
+		log.Error().Err(err).Msg("failed to delete session")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+func (h *AdminHandler) DisconnectSession(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	if err := h.adminService.DisconnectSession(r.Context(), id); err != nil {
+		log.Error().Err(err).Msg("failed to disconnect session")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 		return
 	}

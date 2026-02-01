@@ -13,15 +13,16 @@ import (
 )
 
 type AdminService struct {
-	db              *sqlx.DB
-	sessionRepo     repository.AdminSessionRepository
-	accountRepo     repository.AccountRepository
-	convRepo        repository.ConversationRepository
-	inboundRepo     repository.InboundMessageRepository
-	outboundRepo    repository.OutboundMessageRepository
-	portalUserRepo  repository.PortalUserRepository
-	adminPassword   string
-	sessionSecret   string
+	db                 *sqlx.DB
+	sessionRepo        repository.AdminSessionRepository
+	accountRepo        repository.AccountRepository
+	convRepo           repository.ConversationRepository
+	inboundRepo        repository.InboundMessageRepository
+	outboundRepo       repository.OutboundMessageRepository
+	portalUserRepo     repository.PortalUserRepository
+	pluginSessionRepo  repository.SessionRepository
+	adminPassword      string
+	sessionSecret      string
 }
 
 func NewAdminService(
@@ -32,18 +33,20 @@ func NewAdminService(
 	inboundRepo repository.InboundMessageRepository,
 	outboundRepo repository.OutboundMessageRepository,
 	portalUserRepo repository.PortalUserRepository,
+	pluginSessionRepo repository.SessionRepository,
 	adminPassword, sessionSecret string,
 ) *AdminService {
 	return &AdminService{
-		db:             db,
-		sessionRepo:    sessionRepo,
-		accountRepo:    accountRepo,
-		convRepo:       convRepo,
-		inboundRepo:    inboundRepo,
-		outboundRepo:   outboundRepo,
-		portalUserRepo: portalUserRepo,
-		adminPassword:  adminPassword,
-		sessionSecret:  sessionSecret,
+		db:                db,
+		sessionRepo:       sessionRepo,
+		accountRepo:       accountRepo,
+		convRepo:          convRepo,
+		inboundRepo:       inboundRepo,
+		outboundRepo:      outboundRepo,
+		portalUserRepo:    portalUserRepo,
+		pluginSessionRepo: pluginSessionRepo,
+		adminPassword:     adminPassword,
+		sessionSecret:     sessionSecret,
 	}
 }
 
@@ -85,6 +88,11 @@ func (s *AdminService) ValidateSession(ctx context.Context, token string) bool {
 type Stats struct {
 	Accounts int `json:"accounts"`
 	Mappings int `json:"mappings"`
+	Sessions struct {
+		Pending int `json:"pending"`
+		Paired  int `json:"paired"`
+		Total   int `json:"total"`
+	} `json:"sessions"`
 	Messages struct {
 		Inbound struct {
 			Today  int `json:"today"`
@@ -110,6 +118,23 @@ func (s *AdminService) GetStats(ctx context.Context) (*Stats, error) {
 
 	queuedCount, _ := s.inboundRepo.CountByStatus(ctx, model.InboundStatusQueued)
 	stats.Messages.Inbound.Queued = queuedCount
+
+	// Session stats
+	var sessionStats struct {
+		Pending int `db:"pending"`
+		Paired  int `db:"paired"`
+		Total   int `db:"total"`
+	}
+	s.db.GetContext(ctx, &sessionStats, `
+		SELECT
+			COUNT(*) FILTER (WHERE status = 'pending_pairing') as pending,
+			COUNT(*) FILTER (WHERE status = 'paired') as paired,
+			COUNT(*) as total
+		FROM sessions
+	`)
+	stats.Sessions.Pending = sessionStats.Pending
+	stats.Sessions.Paired = sessionStats.Paired
+	stats.Sessions.Total = sessionStats.Total
 
 	return stats, nil
 }
@@ -327,4 +352,49 @@ func (s *AdminService) UpdateUser(ctx context.Context, id string, isActive *bool
 
 func (s *AdminService) DeleteUser(ctx context.Context, id string) error {
 	return s.portalUserRepo.Delete(ctx, id)
+}
+
+// Sessions (Plugin Sessions)
+
+func (s *AdminService) GetSessions(ctx context.Context, limit, offset int, status string) ([]model.Session, int, error) {
+	var sessions []model.Session
+	var total int
+
+	query := `SELECT * FROM sessions WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM sessions WHERE 1=1`
+	args := []interface{}{}
+	argIndex := 1
+
+	if status != "" {
+		query += ` AND status = $` + strconv.Itoa(argIndex)
+		countQuery += ` AND status = $` + strconv.Itoa(argIndex)
+		args = append(args, status)
+		argIndex++
+	}
+
+	query += ` ORDER BY created_at DESC LIMIT $` + strconv.Itoa(argIndex) + ` OFFSET $` + strconv.Itoa(argIndex+1)
+	args = append(args, limit, offset)
+
+	err := s.db.SelectContext(ctx, &sessions, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	countArgs := args[:len(args)-2]
+	if len(countArgs) > 0 {
+		s.db.GetContext(ctx, &total, countQuery, countArgs...)
+	} else {
+		s.db.GetContext(ctx, &total, countQuery)
+	}
+
+	return sessions, total, nil
+}
+
+func (s *AdminService) DeleteSession(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE id = $1`, id)
+	return err
+}
+
+func (s *AdminService) DisconnectSession(ctx context.Context, id string) error {
+	return s.pluginSessionRepo.MarkDisconnected(ctx, id)
 }
