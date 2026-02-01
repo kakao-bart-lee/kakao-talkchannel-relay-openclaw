@@ -40,11 +40,27 @@ func (h *AdminHandler) Routes() chi.Router {
 	r.Group(func(r chi.Router) {
 		r.Use(h.sessionMiddleware)
 		r.Get("/api/stats", h.Stats)
+
+		// Accounts
 		r.Get("/api/accounts", h.ListAccounts)
 		r.Post("/api/accounts", h.CreateAccount)
 		r.Get("/api/accounts/{id}", h.GetAccount)
 		r.Delete("/api/accounts/{id}", h.DeleteAccount)
 		r.Post("/api/accounts/{id}/regenerate-token", h.RegenerateToken)
+
+		// Mappings
+		r.Get("/api/mappings", h.ListMappings)
+		r.Delete("/api/mappings/{id}", h.DeleteMapping)
+
+		// Messages
+		r.Get("/api/messages/inbound", h.ListInboundMessages)
+		r.Get("/api/messages/outbound", h.ListOutboundMessages)
+
+		// Users
+		r.Get("/api/users", h.ListUsers)
+		r.Get("/api/users/{id}", h.GetUser)
+		r.Patch("/api/users/{id}", h.UpdateUser)
+		r.Delete("/api/users/{id}", h.DeleteUser)
 	})
 
 	return r
@@ -112,11 +128,8 @@ func (h *AdminHandler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"data": accounts,
-		"pagination": map[string]int{
-			"limit":  limit,
-			"offset": offset,
-		},
+		"items": accounts,
+		"total": len(accounts),
 	})
 }
 
@@ -196,4 +209,167 @@ func (h *AdminHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"relayToken": token})
+}
+
+// Mappings
+
+func (h *AdminHandler) ListMappings(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	accountID := r.URL.Query().Get("accountId")
+
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	mappings, total, err := h.adminService.GetMappings(r.Context(), limit, offset, accountID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list mappings")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": mappings,
+		"total": total,
+	})
+}
+
+func (h *AdminHandler) DeleteMapping(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	if err := h.adminService.DeleteMapping(r.Context(), id); err != nil {
+		log.Error().Err(err).Msg("failed to delete mapping")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// Messages
+
+func (h *AdminHandler) ListInboundMessages(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	accountID := r.URL.Query().Get("accountId")
+	status := r.URL.Query().Get("status")
+
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	messages, total, err := h.adminService.GetInboundMessages(r.Context(), limit, offset, accountID, status)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list inbound messages")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": messages,
+		"total": total,
+	})
+}
+
+func (h *AdminHandler) ListOutboundMessages(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	accountID := r.URL.Query().Get("accountId")
+	status := r.URL.Query().Get("status")
+
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	messages, total, err := h.adminService.GetOutboundMessages(r.Context(), limit, offset, accountID, status)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list outbound messages")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": messages,
+		"total": total,
+	})
+}
+
+// Users
+
+func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	users, total, err := h.adminService.GetUsers(r.Context(), limit, offset)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list users")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": users,
+		"total": total,
+	})
+}
+
+func (h *AdminHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	user, err := h.adminService.GetUserByID(r.Context(), id)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get user")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	if user == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "User not found"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+func (h *AdminHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	var req struct {
+		IsActive *bool `json:"isActive"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	user, err := h.adminService.UpdateUser(r.Context(), id, req.IsActive)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to update user")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	if user == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "User not found"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	if err := h.adminService.DeleteUser(r.Context(), id); err != nil {
+		log.Error().Err(err).Msg("failed to delete user")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 }

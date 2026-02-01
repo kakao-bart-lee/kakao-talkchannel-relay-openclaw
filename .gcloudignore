@@ -5,14 +5,16 @@
 # IDE
 .vscode/
 .idea/
+.cursor/
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# Claude/Sisyphus internal
+# Claude/MCP/Sisyphus internal
 .claude/
 .sisyphus/
+.playwright-mcp/
 
 # Logs
 *.log
@@ -22,15 +24,18 @@ logs/
 *_test.go
 internal/*/testdata/
 
-# Documentation (except README)
+# Documentation
 *.md
-!README.md
+docs/
 
 # Local development
 .env
 .env.*
 
-# Old TypeScript source files (root level only)
+# Local build artifacts
+/server
+
+# TypeScript/Node (frontend source - not needed for Go build)
 node_modules/
 dist/
 *.tsbuildinfo
@@ -44,3 +49,6 @@ tailwind.config.ts
 package.json
 /src/
 /drizzle/
+
+# Static files handled separately
+/static/

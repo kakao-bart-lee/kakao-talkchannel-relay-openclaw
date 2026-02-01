@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, UserX, UserCheck, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import { RefreshCw, UserX, UserCheck, Trash2, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
 import { api, type PortalUser } from '../lib/api';
 
 const PAGE_SIZE = 20;
@@ -14,6 +15,23 @@ export function UsersPage(): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  // Client-side filtering
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      const matchesSearch = searchQuery === '' ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && user.isActive) ||
+        (statusFilter === 'inactive' && !user.isActive);
+      return matchesSearch && matchesStatus;
+    });
+  }, [users, searchQuery, statusFilter]);
 
   const loadUsers = useCallback(async (currentPage: number): Promise<void> => {
     try {
@@ -83,12 +101,37 @@ export function UsersPage(): React.ReactElement {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">사용자 관리</h1>
-          <p className="text-muted-foreground">Portal 사용자를 관리합니다.</p>
+          <h1 className="text-2xl font-bold">포털 관리자</h1>
+          <p className="text-muted-foreground">Admin 포털에 로그인할 수 있는 관리자 계정입니다.</p>
         </div>
         <Button variant="outline" onClick={() => loadUsers(page)} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           새로고침
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="이메일로 검색..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+        >
+          <option value="all">모든 상태</option>
+          <option value="active">활성</option>
+          <option value="inactive">비활성</option>
+        </select>
+        <Button variant="outline" onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}>
+          초기화
         </Button>
       </div>
 
@@ -100,16 +143,25 @@ export function UsersPage(): React.ReactElement {
 
       <Card>
         <CardHeader>
-          <CardTitle>사용자 목록 (총 {total}명)</CardTitle>
+          <CardTitle>
+            관리자 목록
+            {searchQuery || statusFilter !== 'all' ? (
+              <span className="text-muted-foreground font-normal ml-2">
+                (검색 결과: {filteredUsers.length}명 / 전체: {total}명)
+              </span>
+            ) : (
+              <span className="text-muted-foreground font-normal ml-2">(총 {total}명)</span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {users.length === 0 ? (
+          {filteredUsers.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
-              등록된 사용자가 없습니다.
+              {users.length === 0 ? '등록된 관리자가 없습니다.' : '검색 결과가 없습니다.'}
             </div>
           ) : (
             <div className="space-y-3">
-              {users.map((user) => {
+              {filteredUsers.map((user) => {
                 const isLoading = actionLoading === user.id;
 
                 return (

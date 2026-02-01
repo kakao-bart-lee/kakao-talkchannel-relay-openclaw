@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
-import { Plus, Trash2, RefreshCw, Copy, Check } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Copy, Check, Search } from 'lucide-react';
 
 export function AccountsPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -14,11 +14,26 @@ export function AccountsPage() {
   const [total, setTotal] = useState(0);
   const limit = 50;
 
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [modeFilter, setModeFilter] = useState<'all' | 'development' | 'production'>('all');
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newAccountData, setNewAccountData] = useState({ openclawUserId: '', mode: 'development', rateLimitPerMinute: 60 });
-  
+
   const [tokenDialog, setTokenDialog] = useState<{ open: boolean; token: string }>({ open: false, token: '' });
   const [copied, setCopied] = useState(false);
+
+  // Client-side filtering
+  const filteredAccounts = useMemo(() => {
+    return accounts.filter((account) => {
+      const matchesSearch = searchQuery === '' ||
+        account.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (account.openclawUserId && account.openclawUserId.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesMode = modeFilter === 'all' || account.mode === modeFilter;
+      return matchesSearch && matchesMode;
+    });
+  }, [accounts, searchQuery, modeFilter]);
 
   const fetchAccounts = async () => {
     setLoading(true);
@@ -79,9 +94,39 @@ export function AccountsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Accounts</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">API 계정</h1>
+          <p className="text-muted-foreground mt-1">
+            OpenClaw 봇이 Relay API에 접근할 때 사용하는 인증 계정입니다.
+          </p>
+        </div>
         <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Create Account
+          <Plus className="mr-2 h-4 w-4" /> 계정 생성
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="ID 또는 OpenClaw User ID로 검색..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <select
+          className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={modeFilter}
+          onChange={(e) => setModeFilter(e.target.value as 'all' | 'development' | 'production')}
+        >
+          <option value="all">모든 모드</option>
+          <option value="development">Development</option>
+          <option value="production">Production</option>
+        </select>
+        <Button variant="outline" onClick={() => { setSearchQuery(''); setModeFilter('all'); }}>
+          초기화
         </Button>
       </div>
 
@@ -91,23 +136,25 @@ export function AccountsPage() {
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>OpenClaw User ID</TableHead>
-              <TableHead>Mode</TableHead>
+              <TableHead>모드</TableHead>
               <TableHead>Rate Limit</TableHead>
-              <TableHead>Created At</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>생성일</TableHead>
+              <TableHead className="text-right">작업</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center h-24">Loading...</TableCell>
+                <TableCell colSpan={6} className="text-center h-24">불러오는 중...</TableCell>
               </TableRow>
-            ) : accounts.length === 0 ? (
+            ) : filteredAccounts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center h-24">No accounts found</TableCell>
+                <TableCell colSpan={6} className="text-center h-24">
+                  {accounts.length === 0 ? '등록된 계정이 없습니다.' : '검색 결과가 없습니다.'}
+                </TableCell>
               </TableRow>
             ) : (
-              accounts.map((account) => (
+              filteredAccounts.map((account) => (
                 <TableRow key={account.id}>
                   <TableCell className="font-mono text-xs">{account.id}</TableCell>
                   <TableCell>{account.openclawUserId || '-'}</TableCell>
