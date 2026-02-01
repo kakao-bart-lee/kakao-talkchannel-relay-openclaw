@@ -371,6 +371,74 @@ GET /health
 
 ---
 
+### 10. SSE Events Stream (OpenClaw)
+
+실시간 이벤트 수신을 위한 Server-Sent Events 스트림.
+
+```
+GET /v1/events
+```
+
+**Headers:**
+```
+Authorization: Bearer <relay_token>
+Accept: text/event-stream
+```
+
+**Event Types:**
+
+#### `connected`
+연결 성공 시 전송.
+
+```json
+{
+  "accountId": "acc_xxx",
+  "sessionId": "sess_yyy",
+  "status": "paired" | "pending_pairing"
+}
+```
+
+#### `message`
+새 메시지 수신 시 전송.
+
+```typescript
+interface SSEMessageEvent {
+  id: string;                        // 메시지 ID
+  conversationKey: string;           // "${channelId}:${userKey}"
+  kakaoPayload: KakaoSkillPayload;   // 카카오 원본 페이로드
+  normalized: {
+    userId: string;                  // plusfriendUserKey
+    text: string;                    // 사용자 발화
+    channelId: string;               // 카카오 채널 ID
+  };
+  createdAt: string;                 // ISO 8601 (예: "2025-01-31T21:00:00Z")
+}
+```
+
+#### `pairing_complete`
+페어링 완료 시 전송.
+
+```json
+{
+  "conversationKey": "channel_123:user_xyz",
+  "pairedAt": "2025-01-31T21:00:00Z"
+}
+```
+
+#### `heartbeat`
+연결 유지용 (30초 간격).
+
+```json
+{}
+```
+
+**Connection Notes:**
+- 연결 끊김 시 자동 재연결 권장
+- `Last-Event-ID` 헤더로 이벤트 재수신 불가 (stateless)
+- 메시지 유실 방지를 위해 `GET /openclaw/messages`와 병행 사용 권장
+
+---
+
 ## Data Models
 
 ### ConversationMapping
@@ -450,6 +518,7 @@ interface PairingCode {
 | `POST /openclaw/reply` | 120 req | per minute per account |
 | `POST /openclaw/pairing/generate` | 10 req | per minute per account |
 | `POST /internal/pairing/verify` | 30 req | per minute per user |
+| `GET /v1/events` | 5 connections | per account (concurrent) |
 
 ---
 

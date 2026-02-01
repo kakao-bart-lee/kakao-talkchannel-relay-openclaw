@@ -146,7 +146,8 @@ func (h *KakaoHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	eventData, _ := json.Marshal(map[string]any{
 		"id":              msg.ID,
 		"conversationKey": conversationKey,
-		"message":         json.RawMessage(normalizedMsg),
+		"kakaoPayload":    json.RawMessage(req.ToJSON()),
+		"normalized":      json.RawMessage(normalizedMsg),
 		"createdAt":       msg.CreatedAt,
 	})
 
