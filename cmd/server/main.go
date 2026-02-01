@@ -90,7 +90,7 @@ func main() {
 	)
 	sessionService := service.NewSessionService(sessionRepo, accountRepo, broker)
 
-	authMiddleware := middleware.NewAuthMiddleware(accountRepo)
+	authMiddleware := middleware.NewAuthMiddleware(accountRepo, sessionRepo)
 	rateLimitMiddleware := middleware.NewRateLimitMiddleware()
 	adminSessionMiddleware := middleware.NewAdminSessionMiddleware(
 		adminSessionRepo, cfg.AdminPassword, cfg.AdminSessionSecret,
@@ -139,10 +139,10 @@ func main() {
 		r.Post("/webhook", kakaoHandler.Webhook)
 	})
 
-	r.Route("/messages", func(r chi.Router) {
+	r.Route("/v1", func(r chi.Router) {
 		r.Use(authMiddleware.Handler)
 		r.Use(rateLimitMiddleware.Handler)
-		r.Get("/stream", eventsHandler.ServeHTTP)
+		r.Get("/events", eventsHandler.ServeHTTP)
 	})
 
 	r.Route("/openclaw", func(r chi.Router) {

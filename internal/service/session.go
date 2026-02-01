@@ -212,12 +212,22 @@ func (s *SessionService) PublishPairingComplete(ctx context.Context, session *mo
 		kakaoUserID = parts[1]
 	}
 
-	eventData := fmt.Sprintf(`{"kakaoUserId":"%s","pairedAt":"%s"}`, kakaoUserID, time.Now().Format(time.RFC3339))
+	eventData := fmt.Sprintf(`{"kakaoUserId":"%s","pairedAt":"%s","accountId":"%s"}`,
+		kakaoUserID, time.Now().Format(time.RFC3339), *session.AccountID)
 
-	return s.broker.Publish(ctx, *session.AccountID, sse.Event{
+	event := sse.Event{
 		Type: "pairing_complete",
 		Data: []byte(eventData),
-	})
+	}
+
+	// Publish to session channel (for pending SSE connections)
+	sessionChannel := "session:" + session.ID
+	if err := s.broker.Publish(ctx, sessionChannel, event); err != nil {
+		log.Warn().Err(err).Str("sessionId", session.ID).Msg("failed to publish to session channel")
+	}
+
+	// Also publish to account channel (for any existing account connections)
+	return s.broker.Publish(ctx, *session.AccountID, event)
 }
 
 func (s *SessionService) PublishPairingExpired(ctx context.Context, sessionID string, reason string) error {
