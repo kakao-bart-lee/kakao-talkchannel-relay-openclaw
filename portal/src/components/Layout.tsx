@@ -50,7 +50,13 @@ export default function Layout(): React.ReactElement {
 
   useEffect(() => {
     api.me()
-      .then(setUser)
+      .then((data) => {
+        if (data) {
+          setUser(data);
+        } else {
+          navigate('/login');
+        }
+      })
       .catch(() => navigate('/login'))
       .finally(() => setLoading(false));
   }, [navigate]);

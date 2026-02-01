@@ -81,6 +81,16 @@ describe('Portal API', () => {
       expect(url).toBe('/portal/api/me');
       expect(result).toEqual(mockUser);
     });
+
+    test('should return null on 401 (silent mode)', async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+      );
+
+      const result = await api.me();
+
+      expect(result).toBeNull();
+    });
   });
 
   describe('generatePairingCode', () => {
