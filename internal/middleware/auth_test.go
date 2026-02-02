@@ -8,10 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/openclaw/relay-server-go/internal/model"
+	"github.com/openclaw/relay-server-go/internal/repository"
 	"github.com/openclaw/relay-server-go/internal/util"
 )
 
@@ -77,6 +79,10 @@ func (m *mockSessionRepo) MarkDisconnected(ctx context.Context, id string) error
 	return nil
 }
 
+func (m *mockSessionRepo) WithTx(tx *sqlx.Tx) repository.SessionRepository {
+	return m
+}
+
 func (m *mockAccountRepo) FindAll(ctx context.Context, limit, offset int) ([]model.Account, error) {
 	return nil, nil
 }
@@ -99,6 +105,10 @@ func (m *mockAccountRepo) Count(ctx context.Context) (int, error) {
 
 func (m *mockAccountRepo) UpdateToken(ctx context.Context, id, token, tokenHash string) (*model.Account, error) {
 	return nil, nil
+}
+
+func (m *mockAccountRepo) WithTx(tx *sqlx.Tx) repository.AccountRepository {
+	return m
 }
 
 func TestAuthMiddleware(t *testing.T) {

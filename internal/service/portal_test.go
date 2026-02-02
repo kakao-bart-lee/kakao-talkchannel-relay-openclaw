@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/openclaw/relay-server-go/internal/model"
+	"github.com/openclaw/relay-server-go/internal/repository"
 )
 
 type mockPortalUserRepo struct {
@@ -156,6 +158,10 @@ func (m *mockAccountRepo) FindAll(ctx context.Context, limit, offset int) ([]mod
 
 func (m *mockAccountRepo) Count(ctx context.Context) (int, error) {
 	return len(m.accounts), nil
+}
+
+func (m *mockAccountRepo) WithTx(tx *sqlx.Tx) repository.AccountRepository {
+	return m
 }
 
 func TestPortalService(t *testing.T) {

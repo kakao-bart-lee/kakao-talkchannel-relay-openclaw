@@ -21,14 +21,27 @@ type SessionRepository interface {
 	MarkDisconnected(ctx context.Context, id string) error
 	DeleteExpired(ctx context.Context) (int64, error)
 	CountPendingByIP(ctx context.Context, ip string, since time.Time) (int, error)
+	// WithTx returns a new repository that uses the given transaction
+	WithTx(tx *sqlx.Tx) SessionRepository
+}
+
+// sessionDB is an interface satisfied by both *sqlx.DB and *sqlx.Tx
+type sessionDB interface {
+	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
 type sessionRepo struct {
-	db *sqlx.DB
+	db sessionDB
 }
 
 func NewSessionRepository(db *sqlx.DB) SessionRepository {
 	return &sessionRepo{db: db}
+}
+
+func (r *sessionRepo) WithTx(tx *sqlx.Tx) SessionRepository {
+	return &sessionRepo{db: tx}
 }
 
 func (r *sessionRepo) FindByID(ctx context.Context, id string) (*model.Session, error) {

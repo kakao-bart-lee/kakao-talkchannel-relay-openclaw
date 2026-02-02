@@ -88,7 +88,7 @@ func main() {
 		cfg, portalUserRepo, oauthAccountRepo, oauthStateRepo,
 		portalSessionRepo, accountRepo, portalService,
 	)
-	sessionService := service.NewSessionService(sessionRepo, accountRepo, broker)
+	sessionService := service.NewSessionService(db, sessionRepo, accountRepo, broker)
 
 	authMiddleware := middleware.NewAuthMiddleware(accountRepo, sessionRepo)
 	rateLimitMiddleware := middleware.NewRateLimitMiddleware()

@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/openclaw/relay-server-go/internal/model"
+	"github.com/openclaw/relay-server-go/internal/repository"
 )
 
 type mockAdminSessionRepo struct {
@@ -184,6 +186,10 @@ func (m *mockSessionRepo) CountPendingByIP(ctx context.Context, ip string, since
 
 func (m *mockSessionRepo) MarkDisconnected(ctx context.Context, id string) error {
 	return nil
+}
+
+func (m *mockSessionRepo) WithTx(tx *sqlx.Tx) repository.SessionRepository {
+	return m
 }
 
 func TestCleanupJob(t *testing.T) {

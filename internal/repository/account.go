@@ -20,14 +20,27 @@ type AccountRepository interface {
 	UpdateToken(ctx context.Context, id, token, tokenHash string) (*model.Account, error)
 	Delete(ctx context.Context, id string) error
 	Count(ctx context.Context) (int, error)
+	// WithTx returns a new repository that uses the given transaction
+	WithTx(tx *sqlx.Tx) AccountRepository
 }
 
 type accountRepo struct {
-	db *sqlx.DB
+	db sqlxDB
+}
+
+// sqlxDB is an interface satisfied by both *sqlx.DB and *sqlx.Tx
+type sqlxDB interface {
+	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
 func NewAccountRepository(db *sqlx.DB) AccountRepository {
 	return &accountRepo{db: db}
+}
+
+func (r *accountRepo) WithTx(tx *sqlx.Tx) AccountRepository {
+	return &accountRepo{db: tx}
 }
 
 func (r *accountRepo) FindByID(ctx context.Context, id string) (*model.Account, error) {
