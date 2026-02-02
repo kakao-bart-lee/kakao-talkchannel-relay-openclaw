@@ -8,6 +8,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 
+	apperrors "github.com/openclaw/relay-server-go/internal/errors"
+	"github.com/openclaw/relay-server-go/internal/httputil"
 	"github.com/openclaw/relay-server-go/internal/middleware"
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/service"
@@ -39,7 +41,7 @@ func (h *OpenClawHandler) Routes() chi.Router {
 func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 	account := middleware.GetAccount(r.Context())
 	if account == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Session not paired"})
+		httputil.WriteError(w, apperrors.SessionNotPaired())
 		return
 	}
 
@@ -48,12 +50,12 @@ func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 		Response  json.RawMessage `json:"response"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		httputil.WriteError(w, apperrors.ValidationError("Invalid request body"))
 		return
 	}
 
 	if req.MessageID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "messageId is required"})
+		httputil.WriteError(w, apperrors.MissingRequired("messageId"))
 		return
 	}
 
@@ -62,12 +64,12 @@ func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 	inbound, err := h.messageService.FindInboundByID(ctx, req.MessageID)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to find inbound message")
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		httputil.WriteError(w, apperrors.Database(err))
 		return
 	}
 
 	if inbound == nil || inbound.AccountID != account.ID {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Message not found"})
+		httputil.WriteError(w, apperrors.NotFound("Message"))
 		return
 	}
 
@@ -79,7 +81,7 @@ func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 			Str("messageId", req.MessageID).
 			Bool("hasCallbackUrl", inbound.CallbackURL != nil).
 			Msg("no valid callback URL for reply")
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Callback URL expired or not available"})
+		httputil.WriteError(w, apperrors.CallbackExpired())
 		return
 	}
 
@@ -92,7 +94,7 @@ func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Error().Err(err).Msg("failed to create outbound message")
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		httputil.WriteError(w, apperrors.Database(err))
 		return
 	}
 
@@ -106,10 +108,7 @@ func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 			Str("outboundId", outbound.ID).
 			Str("messageId", req.MessageID).
 			Msg("failed to send callback to Kakao")
-		writeJSON(w, http.StatusBadGateway, map[string]any{
-			"success": false,
-			"error":   "Failed to send callback to Kakao",
-		})
+		httputil.WriteError(w, apperrors.CallbackFailed("Kakao callback failed"))
 		return
 	}
 
@@ -123,7 +122,7 @@ func (h *OpenClawHandler) Reply(w http.ResponseWriter, r *http.Request) {
 		Str("accountId", account.ID).
 		Msg("reply sent to Kakao")
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	httputil.WriteJSON(w, http.StatusOK, map[string]any{
 		"success":     true,
 		"deliveredAt": deliveredAt,
 	})

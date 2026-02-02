@@ -149,7 +149,7 @@ func TestOpenClawHandler_Reply(t *testing.T) {
 		handler.Reply(rec, req)
 
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
-		assert.Contains(t, rec.Body.String(), "Session not paired")
+		assert.Contains(t, rec.Body.String(), "SESSION_NOT_PAIRED")
 	})
 
 	t.Run("returns 400 when messageId is missing", func(t *testing.T) {
@@ -169,7 +169,7 @@ func TestOpenClawHandler_Reply(t *testing.T) {
 		handler.Reply(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "messageId is required")
+		assert.Contains(t, rec.Body.String(), "MISSING_REQUIRED")
 	})
 
 	t.Run("returns 400 when request body is invalid", func(t *testing.T) {
@@ -189,7 +189,7 @@ func TestOpenClawHandler_Reply(t *testing.T) {
 		handler.Reply(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "Invalid request body")
+		assert.Contains(t, rec.Body.String(), "VALIDATION_ERROR")
 	})
 
 	t.Run("returns 404 when message not found", func(t *testing.T) {
@@ -211,7 +211,7 @@ func TestOpenClawHandler_Reply(t *testing.T) {
 		handler.Reply(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
-		assert.Contains(t, rec.Body.String(), "Message not found")
+		assert.Contains(t, rec.Body.String(), "NOT_FOUND")
 		inboundRepo.AssertExpectations(t)
 	})
 
@@ -243,7 +243,7 @@ func TestOpenClawHandler_Reply(t *testing.T) {
 		handler.Reply(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
-		assert.Contains(t, rec.Body.String(), "Message not found")
+		assert.Contains(t, rec.Body.String(), "NOT_FOUND")
 		inboundRepo.AssertExpectations(t)
 	})
 
@@ -272,7 +272,7 @@ func TestOpenClawHandler_Reply(t *testing.T) {
 		handler.Reply(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "Callback URL expired")
+		assert.Contains(t, rec.Body.String(), "CALLBACK_EXPIRED")
 		inboundRepo.AssertExpectations(t)
 	})
 
@@ -304,7 +304,7 @@ func TestOpenClawHandler_Reply(t *testing.T) {
 		handler.Reply(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), "Callback URL expired")
+		assert.Contains(t, rec.Body.String(), "CALLBACK_EXPIRED")
 		inboundRepo.AssertExpectations(t)
 	})
 }
