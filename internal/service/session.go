@@ -8,8 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 
+	"github.com/openclaw/relay-server-go/internal/database"
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/repository"
 	"github.com/openclaw/relay-server-go/internal/sse"
@@ -44,17 +46,20 @@ type SessionPairResult struct {
 }
 
 type SessionService struct {
+	db          *database.DB
 	sessionRepo repository.SessionRepository
 	accountRepo repository.AccountRepository
 	broker      *sse.Broker
 }
 
 func NewSessionService(
+	db *database.DB,
 	sessionRepo repository.SessionRepository,
 	accountRepo repository.AccountRepository,
 	broker *sse.Broker,
 ) *SessionService {
 	return &SessionService{
+		db:          db,
 		sessionRepo: sessionRepo,
 		accountRepo: accountRepo,
 		broker:      broker,
@@ -142,6 +147,7 @@ func (s *SessionService) FindByID(ctx context.Context, id string) (*model.Sessio
 func (s *SessionService) VerifyPairingCode(ctx context.Context, code, conversationKey string) SessionPairResult {
 	normalizedCode := strings.ToUpper(strings.TrimSpace(code))
 
+	// First, find the session (outside transaction for quick validation)
 	session, err := s.sessionRepo.FindByPairingCode(ctx, normalizedCode)
 	if err != nil {
 		log.Error().Err(err).Msg("verify pairing code: database error")
@@ -153,16 +159,30 @@ func (s *SessionService) VerifyPairingCode(ctx context.Context, code, conversati
 		return SessionPairResult{Success: false, Error: "INVALID_CODE"}
 	}
 
-	// Create account for this session (if not exists)
-	account, err := s.createAccountForSession(ctx, session.ID)
-	if err != nil {
-		log.Error().Err(err).Msg("verify pairing code: create account")
-		return SessionPairResult{Success: false, Error: "INTERNAL_ERROR"}
-	}
+	var account *model.Account
 
-	// Mark session as paired
-	if err := s.sessionRepo.MarkPaired(ctx, session.ID, account.ID, conversationKey); err != nil {
-		log.Error().Err(err).Msg("verify pairing code: mark paired")
+	// Use transaction to ensure atomicity of account creation + session pairing
+	err = s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
+		txAccountRepo := s.accountRepo.WithTx(tx)
+		txSessionRepo := s.sessionRepo.WithTx(tx)
+
+		// Create account for this session within transaction
+		var createErr error
+		account, createErr = s.createAccountForSessionTx(ctx, txAccountRepo, session.ID)
+		if createErr != nil {
+			return fmt.Errorf("create account: %w", createErr)
+		}
+
+		// Mark session as paired within the same transaction
+		if markErr := txSessionRepo.MarkPaired(ctx, session.ID, account.ID, conversationKey); markErr != nil {
+			return fmt.Errorf("mark paired: %w", markErr)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Error().Err(err).Msg("verify pairing code: transaction failed")
 		return SessionPairResult{Success: false, Error: "INTERNAL_ERROR"}
 	}
 
@@ -180,6 +200,10 @@ func (s *SessionService) VerifyPairingCode(ctx context.Context, code, conversati
 }
 
 func (s *SessionService) createAccountForSession(ctx context.Context, sessionID string) (*model.Account, error) {
+	return s.createAccountForSessionTx(ctx, s.accountRepo, sessionID)
+}
+
+func (s *SessionService) createAccountForSessionTx(ctx context.Context, accountRepo repository.AccountRepository, sessionID string) (*model.Account, error) {
 	token, err := util.GenerateToken()
 	if err != nil {
 		return nil, fmt.Errorf("generate token: %w", err)
@@ -187,7 +211,7 @@ func (s *SessionService) createAccountForSession(ctx context.Context, sessionID 
 
 	tokenHash := util.HashToken(token)
 
-	account, err := s.accountRepo.Create(ctx, model.CreateAccountParams{
+	account, err := accountRepo.Create(ctx, model.CreateAccountParams{
 		RelayToken:      token,
 		RelayTokenHash:  tokenHash,
 		Mode:            model.AccountModeRelay,
