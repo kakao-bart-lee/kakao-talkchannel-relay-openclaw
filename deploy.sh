@@ -1,16 +1,16 @@
 #!/bin/bash
 set -e
 
-# Configuration (matches existing Cloud Run deployment)
-SERVICE_NAME="kakao-talkchannel-relay"
-REGION="asia-northeast3"
-PROJECT_ID="${PROJECT_ID:-{PROJECT_ID}}"
-CLOUD_SQL_INSTANCE="{PROJECT_ID}:asia-northeast3:{INSTANCE_NAME}"
-VPC_CONNECTOR="{VPC_CONNECTOR}"
+# Configuration - All values MUST be set via environment variables
+SERVICE_NAME="${SERVICE_NAME:-kakao-talkchannel-relay}"
+REGION="${REGION:?REGION is required}"
+PROJECT_ID="${PROJECT_ID:?PROJECT_ID is required}"
+CLOUD_SQL_INSTANCE="${CLOUD_SQL_INSTANCE:?CLOUD_SQL_INSTANCE is required}"
+VPC_CONNECTOR="${VPC_CONNECTOR:?VPC_CONNECTOR is required}"
 IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${SERVICE_NAME}"
 
-# OAuth Redirect Base URL (defaults to {YOUR_DOMAIN})
-OAUTH_REDIRECT_BASE_URL="${OAUTH_REDIRECT_BASE_URL:-https://{YOUR_DOMAIN}}"
+# OAuth Redirect Base URL (required for OAuth to work)
+OAUTH_REDIRECT_BASE_URL="${OAUTH_REDIRECT_BASE_URL:?OAUTH_REDIRECT_BASE_URL is required}"
 
 echo "Deploying $SERVICE_NAME to Cloud Run..."
 echo "  Project: $PROJECT_ID"
@@ -50,16 +50,16 @@ gcloud run deploy "$SERVICE_NAME" \
   --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
   --vpc-connector "$VPC_CONNECTOR" \
   --set-env-vars "LOG_LEVEL=info,CALLBACK_TTL_SECONDS=55,OAUTH_REDIRECT_BASE_URL=${OAUTH_REDIRECT_BASE_URL}" \
-  --set-secrets "DATABASE_URL=kakao-relay-database-url:latest,\
-REDIS_URL=kakao-relay-redis-url:latest,\
-ADMIN_PASSWORD=kakao-relay-admin-password:latest,\
-PORTAL_SESSION_SECRET=kakao-relay-session-secret:latest,\
-ADMIN_SESSION_SECRET=kakao-relay-admin-session-secret:latest,\
-GOOGLE_CLIENT_ID=kakao-relay-google-client-id:latest,\
-GOOGLE_CLIENT_SECRET=kakao-relay-google-client-secret:latest,\
-TWITTER_CLIENT_ID=kakao-relay-twitter-client-id:latest,\
-TWITTER_CLIENT_SECRET=kakao-relay-twitter-client-secret:latest,\
-OAUTH_STATE_SECRET=kakao-relay-oauth-state-secret:latest"
+  --set-secrets "DATABASE_URL=${SECRET_PREFIX:-kakao-relay}-database-url:latest,\
+REDIS_URL=${SECRET_PREFIX:-kakao-relay}-redis-url:latest,\
+ADMIN_PASSWORD=${SECRET_PREFIX:-kakao-relay}-admin-password:latest,\
+PORTAL_SESSION_SECRET=${SECRET_PREFIX:-kakao-relay}-session-secret:latest,\
+ADMIN_SESSION_SECRET=${SECRET_PREFIX:-kakao-relay}-admin-session-secret:latest,\
+GOOGLE_CLIENT_ID=${SECRET_PREFIX:-kakao-relay}-google-client-id:latest,\
+GOOGLE_CLIENT_SECRET=${SECRET_PREFIX:-kakao-relay}-google-client-secret:latest,\
+TWITTER_CLIENT_ID=${SECRET_PREFIX:-kakao-relay}-twitter-client-id:latest,\
+TWITTER_CLIENT_SECRET=${SECRET_PREFIX:-kakao-relay}-twitter-client-secret:latest,\
+OAUTH_STATE_SECRET=${SECRET_PREFIX:-kakao-relay}-oauth-state-secret:latest"
 
 echo ""
 echo "Deployment complete!"
