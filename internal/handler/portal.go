@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 
+	"github.com/openclaw/relay-server-go/internal/audit"
 	"github.com/openclaw/relay-server-go/internal/middleware"
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/service"
@@ -55,10 +56,24 @@ func (h *PortalHandler) Routes() chi.Router {
 }
 
 func (h *PortalHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	user := h.getSessionUser(r)
+
 	cookie, err := r.Cookie(middleware.PortalSessionCookie)
 	if err == nil && cookie.Value != "" {
 		h.portalService.Logout(r.Context(), cookie.Value)
 	}
+
+	event := audit.Event{
+		Type: audit.EventLogout,
+		Details: map[string]interface{}{
+			"target": "portal",
+		},
+	}
+	if user != nil {
+		event.UserID = user.ID
+		event.AccountID = user.AccountID
+	}
+	audit.LogFromRequest(r, event)
 
 	middleware.ClearSessionCookie(w, middleware.PortalSessionCookie, "/portal")
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
@@ -263,6 +278,15 @@ func (h *PortalHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	audit.LogFromRequest(r, audit.Event{
+		Type:      audit.EventTokenRegenerate,
+		UserID:    user.ID,
+		AccountID: user.AccountID,
+		Details: map[string]interface{}{
+			"regenerated_by": "portal_user",
+		},
+	})
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"token":     newToken,
 		"createdAt": account.UpdatedAt.Format(time.RFC3339),
@@ -288,6 +312,15 @@ func (h *PortalHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Please confirm deletion by sending {\"confirm\": \"DELETE\"}"})
 		return
 	}
+
+	audit.LogFromRequest(r, audit.Event{
+		Type:      audit.EventAccountDelete,
+		UserID:    user.ID,
+		AccountID: user.AccountID,
+		Details: map[string]interface{}{
+			"deleted_by": "self",
+		},
+	})
 
 	if err := h.portalService.DeleteAccount(r.Context(), user.ID); err != nil {
 		log.Error().Err(err).Msg("failed to delete account")
