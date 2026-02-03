@@ -66,14 +66,29 @@ export interface PluginSession {
   updatedAt: string;
 }
 
-export async function fetchApi<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+function getCSRFToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  const method = options.method?.toUpperCase() ?? 'GET';
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const csrfToken = getCSRFToken();
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
+
   const res = await fetch(endpoint, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...headers,
       ...options.headers,
     },
   });
@@ -100,13 +115,13 @@ export async function fetchApi<T>(
 }
 
 export const api = {
-  login: (password: string) => 
+  login: (password: string) =>
     fetchApi<{ success: true }>('/admin/api/login', {
       method: 'POST',
       body: JSON.stringify({ password }),
     }),
 
-  logout: () => 
+  logout: () =>
     fetchApi<{ success: true }>('/admin/api/logout', {
       method: 'POST',
     }),
@@ -133,7 +148,10 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  updateAccount: (id: string, data: Partial<Pick<Account, 'openclawUserId' | 'mode' | 'rateLimitPerMinute'>>) =>
+  updateAccount: (
+    id: string,
+    data: Partial<Pick<Account, 'openclawUserId' | 'mode' | 'rateLimitPerMinute'>>
+  ) =>
     fetchApi<Account>(`/admin/api/accounts/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -164,14 +182,18 @@ export const api = {
     const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
     if (accountId) params.append('accountId', accountId);
     if (status) params.append('status', status);
-    return fetchApi<{ items: InboundMessage[]; total: number }>(`/admin/api/messages/inbound?${params}`);
+    return fetchApi<{ items: InboundMessage[]; total: number }>(
+      `/admin/api/messages/inbound?${params}`
+    );
   },
 
   getOutboundMessages: (limit = 50, offset = 0, accountId?: string, status?: string) => {
     const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
     if (accountId) params.append('accountId', accountId);
     if (status) params.append('status', status);
-    return fetchApi<{ items: OutboundMessage[]; total: number }>(`/admin/api/messages/outbound?${params}`);
+    return fetchApi<{ items: OutboundMessage[]; total: number }>(
+      `/admin/api/messages/outbound?${params}`
+    );
   },
 
   // Users
@@ -180,8 +202,7 @@ export const api = {
     return fetchApi<{ items: PortalUser[]; total: number }>(`/admin/api/users?${params}`);
   },
 
-  getUser: (id: string) =>
-    fetchApi<PortalUser>(`/admin/api/users/${id}`),
+  getUser: (id: string) => fetchApi<PortalUser>(`/admin/api/users/${id}`),
 
   updateUser: (id: string, data: { isActive?: boolean }) =>
     fetchApi<PortalUser>(`/admin/api/users/${id}`, {

@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -11,11 +10,13 @@ import (
 	"github.com/openclaw/relay-server-go/internal/middleware"
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/service"
+	"github.com/openclaw/relay-server-go/internal/util"
 )
 
 type AdminHandler struct {
 	adminService      *service.AdminService
 	sessionMiddleware func(http.Handler) http.Handler
+	loginRateLimiter  *middleware.LoginRateLimiter
 	isProduction      bool
 }
 
@@ -27,6 +28,7 @@ func NewAdminHandler(
 	return &AdminHandler{
 		adminService:      adminService,
 		sessionMiddleware: sessionMiddleware,
+		loginRateLimiter:  middleware.NewLoginRateLimiter(),
 		isProduction:      isProduction,
 	}
 }
@@ -34,7 +36,7 @@ func NewAdminHandler(
 func (h *AdminHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 
-	r.Post("/api/login", h.Login)
+	r.With(h.loginRateLimiter.Handler).Post("/api/login", h.Login)
 	r.Post("/api/logout", h.Logout)
 
 	r.Group(func(r chi.Router) {
@@ -118,14 +120,9 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) ListAccounts(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	p := ParsePagination(r)
 
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
-
-	accounts, err := h.adminService.GetAccounts(r.Context(), limit, offset)
+	accounts, err := h.adminService.GetAccounts(r.Context(), p.Limit, p.Offset)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to list accounts")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
@@ -144,7 +141,10 @@ func (h *AdminHandler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		Mode               string  `json:"mode"`
 		RateLimitPerMinute int     `json:"rateLimitPerMinute"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
 
 	mode := model.AccountModeRelay
 	if req.Mode == "direct" {
@@ -219,15 +219,10 @@ func (h *AdminHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) {
 // Mappings
 
 func (h *AdminHandler) ListMappings(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	p := ParsePagination(r)
 	accountID := r.URL.Query().Get("accountId")
 
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
-
-	mappings, total, err := h.adminService.GetMappings(r.Context(), limit, offset, accountID)
+	mappings, total, err := h.adminService.GetMappings(r.Context(), p.Limit, p.Offset, accountID)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to list mappings")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
@@ -254,17 +249,23 @@ func (h *AdminHandler) DeleteMapping(w http.ResponseWriter, r *http.Request) {
 
 // Messages
 
+var validInboundStatuses = []string{"queued", "delivered", "expired", "failed"}
+
 func (h *AdminHandler) ListInboundMessages(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	p := ParsePagination(r)
 	accountID := r.URL.Query().Get("accountId")
 	status := r.URL.Query().Get("status")
 
-	if limit <= 0 || limit > 100 {
-		limit = 50
+	if accountID != "" && !util.IsValidUUID(accountID) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid accountId format"})
+		return
+	}
+	if !util.IsValidEnum(status, validInboundStatuses) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid status value"})
+		return
 	}
 
-	messages, total, err := h.adminService.GetInboundMessages(r.Context(), limit, offset, accountID, status)
+	messages, total, err := h.adminService.GetInboundMessages(r.Context(), p.Limit, p.Offset, accountID, status)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to list inbound messages")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
@@ -277,17 +278,23 @@ func (h *AdminHandler) ListInboundMessages(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+var validOutboundStatuses = []string{"pending", "sent", "failed"}
+
 func (h *AdminHandler) ListOutboundMessages(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	p := ParsePagination(r)
 	accountID := r.URL.Query().Get("accountId")
 	status := r.URL.Query().Get("status")
 
-	if limit <= 0 || limit > 100 {
-		limit = 50
+	if accountID != "" && !util.IsValidUUID(accountID) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid accountId format"})
+		return
+	}
+	if !util.IsValidEnum(status, validOutboundStatuses) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid status value"})
+		return
 	}
 
-	messages, total, err := h.adminService.GetOutboundMessages(r.Context(), limit, offset, accountID, status)
+	messages, total, err := h.adminService.GetOutboundMessages(r.Context(), p.Limit, p.Offset, accountID, status)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to list outbound messages")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
@@ -303,14 +310,9 @@ func (h *AdminHandler) ListOutboundMessages(w http.ResponseWriter, r *http.Reque
 // Users
 
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	p := ParsePagination(r)
 
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
-
-	users, total, err := h.adminService.GetUsers(r.Context(), limit, offset)
+	users, total, err := h.adminService.GetUsers(r.Context(), p.Limit, p.Offset)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to list users")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
@@ -381,16 +383,18 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 // Sessions (Plugin Sessions)
 
+var validSessionStatuses = []string{"pending_pairing", "paired", "expired", "disconnected"}
+
 func (h *AdminHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	p := ParsePagination(r)
 	status := r.URL.Query().Get("status")
 
-	if limit <= 0 || limit > 100 {
-		limit = 50
+	if !util.IsValidEnum(status, validSessionStatuses) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid status value"})
+		return
 	}
 
-	sessions, total, err := h.adminService.GetSessions(r.Context(), limit, offset, status)
+	sessions, total, err := h.adminService.GetSessions(r.Context(), p.Limit, p.Offset, status)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to list sessions")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})

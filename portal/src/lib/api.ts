@@ -62,13 +62,31 @@ interface RequestOptions extends RequestInit {
   silent401?: boolean;
 }
 
+function getCSRFToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { silent401, ...fetchOptions } = options;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  const method = fetchOptions.method?.toUpperCase() ?? 'GET';
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const csrfToken = getCSRFToken();
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
 
   const res = await fetch(path, {
     ...fetchOptions,
     headers: {
-      'Content-Type': 'application/json',
+      ...headers,
       ...fetchOptions.headers,
     },
   });
@@ -104,7 +122,10 @@ export const api = {
       method: 'POST',
     }),
 
-  me: () => request<MeResponse | null>('/portal/api/me', { silent401: true }).then(res => res?.user ?? null),
+  me: () =>
+    request<MeResponse | null>('/portal/api/me', { silent401: true }).then(
+      (res) => res?.user ?? null
+    ),
 
   generatePairingCode: (expirySeconds?: number) =>
     request<PairingCode>('/portal/api/pairing/generate', {
@@ -112,12 +133,16 @@ export const api = {
       body: JSON.stringify({ expirySeconds }),
     }),
 
-  getConnections: () => request<{ connections: Connection[]; total: number }>('/portal/api/connections'),
+  getConnections: () =>
+    request<{ connections: Connection[]; total: number }>('/portal/api/connections'),
 
   unpairConnection: (conversationKey: string) =>
-    request<UnpairResponse>(`/portal/api/connections/${encodeURIComponent(conversationKey)}/unpair`, {
-      method: 'POST',
-    }),
+    request<UnpairResponse>(
+      `/portal/api/connections/${encodeURIComponent(conversationKey)}/unpair`,
+      {
+        method: 'POST',
+      }
+    ),
 
   blockConnection: (conversationKey: string) =>
     request<BlockResponse>(`/portal/api/connections/${encodeURIComponent(conversationKey)}/block`, {
@@ -147,8 +172,7 @@ export const api = {
   },
 
   // OAuth endpoints
-  getLinkedProviders: () =>
-    request<OAuthProvidersResponse>('/portal/api/oauth/providers'),
+  getLinkedProviders: () => request<OAuthProvidersResponse>('/portal/api/oauth/providers'),
 
   unlinkProvider: (provider: string) =>
     request<{ success: boolean }>(`/portal/api/oauth/unlink/${encodeURIComponent(provider)}`, {
