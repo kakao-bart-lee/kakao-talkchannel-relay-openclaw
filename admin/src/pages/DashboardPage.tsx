@@ -4,7 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Users, Link as LinkIcon, MessageSquare, ArrowUpRight, ArrowDownRight, Plug } from 'lucide-react';
 
 export function DashboardPage() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<{
+    accounts: number;
+    mappings: number;
+    sessions: { pending: number; paired: number; total: number };
+    messages: {
+      inbound: { today: number; week: number; queued: number };
+      outbound: { today: number; week: number; failed: number };
+    };
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -13,8 +21,8 @@ export function DashboardPage() {
       try {
         const data = await api.getStats();
         setStats(data);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load stats');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load stats');
       } finally {
         setLoading(false);
       }
