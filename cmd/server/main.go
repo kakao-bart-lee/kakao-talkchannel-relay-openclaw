@@ -42,7 +42,7 @@ func main() {
 	}
 	defer db.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), config.DBPingTimeout)
 	if err := db.Ping(ctx); err != nil {
 		log.Fatal().Err(err).Msg("failed to ping database")
 	}
@@ -98,6 +98,8 @@ func main() {
 	kakaoSignatureMiddleware := middleware.NewKakaoSignatureMiddleware(cfg.KakaoSignatureSecret)
 
 	isProduction := os.Getenv("FLY_APP_NAME") != ""
+	csrfMiddleware := middleware.NewCSRFMiddleware(isProduction)
+	bodyLimitMiddleware := middleware.NewBodyLimitMiddleware(0)
 
 	kakaoHandler := handler.NewKakaoHandler(
 		convService, sessionService, messageService, broker, cfg.CallbackTTL(),
@@ -117,7 +119,8 @@ func main() {
 	r.Use(chimiddleware.RealIP)
 	r.Use(middleware.RequestLogger)
 	r.Use(chimiddleware.Recoverer)
-	r.Use(chimiddleware.Timeout(60 * time.Second))
+	r.Use(chimiddleware.Timeout(config.ServerRequestTimeout))
+	r.Use(bodyLimitMiddleware.Handler)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -154,11 +157,13 @@ func main() {
 	})
 
 	r.Route("/admin", func(r chi.Router) {
+		r.Use(csrfMiddleware.Handler)
 		r.Mount("/", adminHandler.Routes())
 		r.NotFound(handler.StaticFileServer("static/admin", "/admin").ServeHTTP)
 	})
 
 	r.Route("/portal", func(r chi.Router) {
+		r.Use(csrfMiddleware.Handler)
 		r.Mount("/", portalHandler.Routes())
 		r.Mount("/api/oauth", oauthHandler.Routes())
 		r.NotFound(handler.StaticFileServer("static/portal", "/portal").ServeHTTP)
@@ -166,7 +171,7 @@ func main() {
 
 	cleanupJob := jobs.NewCleanupJob(
 		adminSessionRepo, portalSessionRepo, pairingCodeRepo, inboundMsgRepo,
-		oauthStateRepo, sessionRepo, 5*time.Minute,
+		oauthStateRepo, sessionRepo, config.CleanupJobInterval,
 	)
 	cleanupJob.Start()
 	defer cleanupJob.Stop()
@@ -174,9 +179,9 @@ func main() {
 	server := &http.Server{
 		Addr:         cfg.Addr(),
 		Handler:      r,
-		ReadTimeout:  15 * time.Second,
+		ReadTimeout:  config.ServerReadTimeout,
 		WriteTimeout: 0,
-		IdleTimeout:  120 * time.Second,
+		IdleTimeout:  config.ServerIdleTimeout,
 	}
 
 	go func() {
@@ -191,7 +196,7 @@ func main() {
 	<-quit
 	log.Info().Msg("shutting down server")
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), config.ServerShutdownTimeout)
 	defer shutdownCancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {

@@ -64,7 +64,10 @@ func (s *OAuthService) GetAuthURL(ctx context.Context, provider string) (string,
 
 	var codeVerifier *string
 	if provider == model.OAuthProviderTwitter {
-		verifier, _ := util.GenerateToken()
+		verifier, err := util.GenerateToken()
+		if err != nil {
+			return "", fmt.Errorf("failed to generate code verifier: %w", err)
+		}
 		codeVerifier = &verifier
 	}
 
@@ -167,7 +170,10 @@ func (s *OAuthService) linkOAuthAccount(ctx context.Context, userID, provider st
 }
 
 func (s *OAuthService) createOAuthUser(ctx context.Context, provider string, profile *model.OAuthUserProfile) (*model.PortalUser, error) {
-	relayToken, _ := util.GenerateToken()
+	relayToken, err := util.GenerateToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate relay token: %w", err)
+	}
 	tokenHash := util.HashToken(relayToken)
 
 	account, err := s.accountRepo.Create(ctx, model.CreateAccountParams{
@@ -261,9 +267,12 @@ func (s *OAuthService) exchangeGoogleCode(ctx context.Context, code string) (*mo
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Google token response: %w", err)
+	}
 	if resp.StatusCode != http.StatusOK {
-		log.Error().Int("status", resp.StatusCode).Str("body", string(body)).Msg("Google token exchange failed")
+		log.Error().Int("status", resp.StatusCode).Msg("Google token exchange failed")
 		return nil, ErrOAuthProviderError
 	}
 
@@ -275,7 +284,10 @@ func (s *OAuthService) exchangeGoogleCode(ctx context.Context, code string) (*mo
 		return nil, err
 	}
 
-	req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create userinfo request: %w", err)
+	}
 	req.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -285,9 +297,12 @@ func (s *OAuthService) exchangeGoogleCode(ctx context.Context, code string) (*mo
 	}
 	defer userResp.Body.Close()
 
-	userBody, _ := io.ReadAll(userResp.Body)
+	userBody, err := io.ReadAll(userResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Google userinfo response: %w", err)
+	}
 	if userResp.StatusCode != http.StatusOK {
-		log.Error().Int("status", userResp.StatusCode).Str("body", string(userBody)).Msg("Google userinfo failed")
+		log.Error().Int("status", userResp.StatusCode).Msg("Google userinfo failed")
 		return nil, ErrOAuthProviderError
 	}
 
@@ -347,7 +362,10 @@ func (s *OAuthService) exchangeTwitterCode(ctx context.Context, code string, cod
 		"code_verifier": {*codeVerifier},
 	}
 
-	req, _ := http.NewRequest("POST", "https://api.twitter.com/2/oauth2/token", strings.NewReader(data.Encode()))
+	req, err := http.NewRequest("POST", "https://api.twitter.com/2/oauth2/token", strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Twitter token request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(s.cfg.TwitterClientID, s.cfg.TwitterClientSecret)
 
@@ -358,9 +376,12 @@ func (s *OAuthService) exchangeTwitterCode(ctx context.Context, code string, cod
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Twitter token response: %w", err)
+	}
 	if resp.StatusCode != http.StatusOK {
-		log.Error().Int("status", resp.StatusCode).Str("body", string(body)).Msg("Twitter token exchange failed")
+		log.Error().Int("status", resp.StatusCode).Msg("Twitter token exchange failed")
 		return nil, ErrOAuthProviderError
 	}
 
@@ -371,7 +392,10 @@ func (s *OAuthService) exchangeTwitterCode(ctx context.Context, code string, cod
 		return nil, err
 	}
 
-	userReq, _ := http.NewRequestWithContext(ctx, "GET", "https://api.twitter.com/2/users/me?user.fields=profile_image_url", nil)
+	userReq, err := http.NewRequestWithContext(ctx, "GET", "https://api.twitter.com/2/users/me?user.fields=profile_image_url", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Twitter user request: %w", err)
+	}
 	userReq.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
 
 	userResp, err := client.Do(userReq)
@@ -380,9 +404,12 @@ func (s *OAuthService) exchangeTwitterCode(ctx context.Context, code string, cod
 	}
 	defer userResp.Body.Close()
 
-	userBody, _ := io.ReadAll(userResp.Body)
+	userBody, err := io.ReadAll(userResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Twitter user response: %w", err)
+	}
 	if userResp.StatusCode != http.StatusOK {
-		log.Error().Int("status", userResp.StatusCode).Str("body", string(userBody)).Msg("Twitter user info failed")
+		log.Error().Int("status", userResp.StatusCode).Msg("Twitter user info failed")
 		return nil, ErrOAuthProviderError
 	}
 

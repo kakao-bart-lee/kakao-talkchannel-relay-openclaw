@@ -2,27 +2,71 @@ package service
 
 import (
 	"context"
-	"strconv"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/rs/zerolog/log"
 
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/repository"
 	"github.com/openclaw/relay-server-go/internal/util"
 )
 
+type queryBuilder struct {
+	conditions []string
+	args       []interface{}
+}
+
+func newQueryBuilder() *queryBuilder {
+	return &queryBuilder{
+		conditions: make([]string, 0),
+		args:       make([]interface{}, 0),
+	}
+}
+
+func (qb *queryBuilder) addCondition(column string, value interface{}) {
+	if value == nil {
+		return
+	}
+	if s, ok := value.(string); ok && s == "" {
+		return
+	}
+	qb.args = append(qb.args, value)
+	qb.conditions = append(qb.conditions, fmt.Sprintf("%s = $%d", column, len(qb.args)))
+}
+
+func (qb *queryBuilder) buildSelect(table string, limit, offset int) (selectQuery, countQuery string, args []interface{}) {
+	whereClause := ""
+	if len(qb.conditions) > 0 {
+		whereClause = " WHERE " + strings.Join(qb.conditions, " AND ")
+	}
+
+	countQuery = fmt.Sprintf("SELECT COUNT(*) FROM %s%s", table, whereClause)
+
+	limitIdx := len(qb.args) + 1
+	offsetIdx := len(qb.args) + 2
+	selectQuery = fmt.Sprintf(
+		"SELECT * FROM %s%s ORDER BY created_at DESC LIMIT $%d OFFSET $%d",
+		table, whereClause, limitIdx, offsetIdx,
+	)
+
+	args = append(qb.args, limit, offset)
+	return selectQuery, countQuery, args
+}
+
 type AdminService struct {
-	db                 *sqlx.DB
-	sessionRepo        repository.AdminSessionRepository
-	accountRepo        repository.AccountRepository
-	convRepo           repository.ConversationRepository
-	inboundRepo        repository.InboundMessageRepository
-	outboundRepo       repository.OutboundMessageRepository
-	portalUserRepo     repository.PortalUserRepository
-	pluginSessionRepo  repository.SessionRepository
-	adminPassword      string
-	sessionSecret      string
+	db                *sqlx.DB
+	sessionRepo       repository.AdminSessionRepository
+	accountRepo       repository.AccountRepository
+	convRepo          repository.ConversationRepository
+	inboundRepo       repository.InboundMessageRepository
+	outboundRepo      repository.OutboundMessageRepository
+	portalUserRepo    repository.PortalUserRepository
+	pluginSessionRepo repository.SessionRepository
+	adminPassword     string
+	sessionSecret     string
 }
 
 func NewAdminService(
@@ -110,13 +154,22 @@ type Stats struct {
 func (s *AdminService) GetStats(ctx context.Context) (*Stats, error) {
 	stats := &Stats{}
 
-	accounts, _ := s.accountRepo.Count(ctx)
+	accounts, err := s.accountRepo.Count(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to get account count for stats")
+	}
 	stats.Accounts = accounts
 
-	pairedCount, _ := s.convRepo.CountByState(ctx, model.PairingStatePaired)
+	pairedCount, err := s.convRepo.CountByState(ctx, model.PairingStatePaired)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to get paired count for stats")
+	}
 	stats.Mappings = pairedCount
 
-	queuedCount, _ := s.inboundRepo.CountByStatus(ctx, model.InboundStatusQueued)
+	queuedCount, err := s.inboundRepo.CountByStatus(ctx, model.InboundStatusQueued)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to get queued count for stats")
+	}
 	stats.Messages.Inbound.Queued = queuedCount
 
 	// Session stats
@@ -125,13 +178,16 @@ func (s *AdminService) GetStats(ctx context.Context) (*Stats, error) {
 		Paired  int `db:"paired"`
 		Total   int `db:"total"`
 	}
-	s.db.GetContext(ctx, &sessionStats, `
+	err = s.db.GetContext(ctx, &sessionStats, `
 		SELECT
 			COUNT(*) FILTER (WHERE status = 'pending_pairing') as pending,
 			COUNT(*) FILTER (WHERE status = 'paired') as paired,
 			COUNT(*) as total
 		FROM sessions
 	`)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to get session stats")
+	}
 	stats.Sessions.Pending = sessionStats.Pending
 	stats.Sessions.Paired = sessionStats.Paired
 	stats.Sessions.Total = sessionStats.Total
@@ -209,7 +265,9 @@ func (s *AdminService) GetMappings(ctx context.Context, limit, offset int, accou
 			LIMIT $1 OFFSET $2
 		`, limit, offset)
 		if err == nil {
-			s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM conversation_mappings`)
+			if countErr := s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM conversation_mappings`); countErr != nil {
+				log.Warn().Err(countErr).Msg("failed to get mappings count")
+			}
 		}
 	}
 
@@ -244,35 +302,26 @@ func (s *AdminService) GetInboundMessages(ctx context.Context, limit, offset int
 	var messages []model.InboundMessage
 	var total int
 
-	query := `SELECT * FROM inbound_messages WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM inbound_messages WHERE 1=1`
-	args := []interface{}{}
-	argIndex := 1
+	qb := newQueryBuilder()
+	qb.addCondition("account_id", accountID)
+	qb.addCondition("status", status)
 
-	if accountID != "" {
-		query += ` AND account_id = $` + strconv.Itoa(argIndex)
-		countQuery += ` AND account_id = $` + strconv.Itoa(argIndex)
-		args = append(args, accountID)
-		argIndex++
-	}
+	selectQuery, countQuery, args := qb.buildSelect("inbound_messages", limit, offset)
 
-	if status != "" {
-		query += ` AND status = $` + strconv.Itoa(argIndex)
-		countQuery += ` AND status = $` + strconv.Itoa(argIndex)
-		args = append(args, status)
-		argIndex++
-	}
-
-	query += ` ORDER BY created_at DESC LIMIT $` + strconv.Itoa(argIndex) + ` OFFSET $` + strconv.Itoa(argIndex+1)
-	args = append(args, limit, offset)
-
-	err := s.db.SelectContext(ctx, &messages, query, args...)
-	if err != nil {
+	if err := s.db.SelectContext(ctx, &messages, selectQuery, args...); err != nil {
 		return nil, 0, err
 	}
 
 	countArgs := args[:len(args)-2]
-	s.db.GetContext(ctx, &total, countQuery, countArgs...)
+	if len(countArgs) > 0 {
+		if countErr := s.db.GetContext(ctx, &total, countQuery, countArgs...); countErr != nil {
+			log.Warn().Err(countErr).Msg("failed to get inbound messages count")
+		}
+	} else {
+		if countErr := s.db.GetContext(ctx, &total, countQuery); countErr != nil {
+			log.Warn().Err(countErr).Msg("failed to get inbound messages count")
+		}
+	}
 
 	return messages, total, nil
 }
@@ -281,35 +330,26 @@ func (s *AdminService) GetOutboundMessages(ctx context.Context, limit, offset in
 	var messages []model.OutboundMessage
 	var total int
 
-	query := `SELECT * FROM outbound_messages WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM outbound_messages WHERE 1=1`
-	args := []interface{}{}
-	argIndex := 1
+	qb := newQueryBuilder()
+	qb.addCondition("account_id", accountID)
+	qb.addCondition("status", status)
 
-	if accountID != "" {
-		query += ` AND account_id = $` + strconv.Itoa(argIndex)
-		countQuery += ` AND account_id = $` + strconv.Itoa(argIndex)
-		args = append(args, accountID)
-		argIndex++
-	}
+	selectQuery, countQuery, args := qb.buildSelect("outbound_messages", limit, offset)
 
-	if status != "" {
-		query += ` AND status = $` + strconv.Itoa(argIndex)
-		countQuery += ` AND status = $` + strconv.Itoa(argIndex)
-		args = append(args, status)
-		argIndex++
-	}
-
-	query += ` ORDER BY created_at DESC LIMIT $` + strconv.Itoa(argIndex) + ` OFFSET $` + strconv.Itoa(argIndex+1)
-	args = append(args, limit, offset)
-
-	err := s.db.SelectContext(ctx, &messages, query, args...)
-	if err != nil {
+	if err := s.db.SelectContext(ctx, &messages, selectQuery, args...); err != nil {
 		return nil, 0, err
 	}
 
 	countArgs := args[:len(args)-2]
-	s.db.GetContext(ctx, &total, countQuery, countArgs...)
+	if len(countArgs) > 0 {
+		if countErr := s.db.GetContext(ctx, &total, countQuery, countArgs...); countErr != nil {
+			log.Warn().Err(countErr).Msg("failed to get outbound messages count")
+		}
+	} else {
+		if countErr := s.db.GetContext(ctx, &total, countQuery); countErr != nil {
+			log.Warn().Err(countErr).Msg("failed to get outbound messages count")
+		}
+	}
 
 	return messages, total, nil
 }
@@ -329,7 +369,9 @@ func (s *AdminService) GetUsers(ctx context.Context, limit, offset int) ([]model
 		return nil, 0, err
 	}
 
-	s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM portal_users`)
+	if countErr := s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM portal_users`); countErr != nil {
+		log.Warn().Err(countErr).Msg("failed to get portal users count")
+	}
 
 	return users, total, nil
 }
@@ -360,31 +402,24 @@ func (s *AdminService) GetSessions(ctx context.Context, limit, offset int, statu
 	var sessions []model.Session
 	var total int
 
-	query := `SELECT * FROM sessions WHERE 1=1`
-	countQuery := `SELECT COUNT(*) FROM sessions WHERE 1=1`
-	args := []interface{}{}
-	argIndex := 1
+	qb := newQueryBuilder()
+	qb.addCondition("status", status)
 
-	if status != "" {
-		query += ` AND status = $` + strconv.Itoa(argIndex)
-		countQuery += ` AND status = $` + strconv.Itoa(argIndex)
-		args = append(args, status)
-		argIndex++
-	}
+	selectQuery, countQuery, args := qb.buildSelect("sessions", limit, offset)
 
-	query += ` ORDER BY created_at DESC LIMIT $` + strconv.Itoa(argIndex) + ` OFFSET $` + strconv.Itoa(argIndex+1)
-	args = append(args, limit, offset)
-
-	err := s.db.SelectContext(ctx, &sessions, query, args...)
-	if err != nil {
+	if err := s.db.SelectContext(ctx, &sessions, selectQuery, args...); err != nil {
 		return nil, 0, err
 	}
 
 	countArgs := args[:len(args)-2]
 	if len(countArgs) > 0 {
-		s.db.GetContext(ctx, &total, countQuery, countArgs...)
+		if countErr := s.db.GetContext(ctx, &total, countQuery, countArgs...); countErr != nil {
+			log.Warn().Err(countErr).Msg("failed to get sessions count")
+		}
 	} else {
-		s.db.GetContext(ctx, &total, countQuery)
+		if countErr := s.db.GetContext(ctx, &total, countQuery); countErr != nil {
+			log.Warn().Err(countErr).Msg("failed to get sessions count")
+		}
 	}
 
 	return sessions, total, nil
