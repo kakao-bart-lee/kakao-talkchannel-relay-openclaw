@@ -128,6 +128,14 @@ func (m *mockInboundMsgRepo) CountByAccountID(ctx context.Context, accountID str
 	return 0, nil
 }
 
+func (m *mockInboundMsgRepo) CountByAccountIDAndStatus(ctx context.Context, accountID string, status model.InboundMessageStatus) (int, error) {
+	return 0, nil
+}
+
+func (m *mockInboundMsgRepo) CountByAccountIDSince(ctx context.Context, accountID string, since time.Time) (int, error) {
+	return 0, nil
+}
+
 type mockOAuthStateRepo struct {
 	deleteExpiredCount int64
 }

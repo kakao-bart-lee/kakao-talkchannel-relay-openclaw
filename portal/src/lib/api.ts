@@ -58,6 +58,37 @@ export interface OAuthProvidersResponse {
   providers: OAuthProvider[];
 }
 
+export interface RecentError {
+  id: string;
+  conversationKey: string;
+  errorMessage: string;
+  createdAt: string;
+}
+
+export interface UserStats {
+  connections: {
+    total: number;
+    paired: number;
+    blocked: number;
+  };
+  messages: {
+    inbound: {
+      today: number;
+      total: number;
+      queued: number;
+      expired: number;
+    };
+    outbound: {
+      today: number;
+      total: number;
+      sent: number;
+      failed: number;
+    };
+  };
+  recentErrors: RecentError[];
+  lastActivity: string | null;
+}
+
 interface RequestOptions extends RequestInit {
   silent401?: boolean;
 }
@@ -126,6 +157,8 @@ export const api = {
     request<MeResponse | null>('/portal/api/me', { silent401: true }).then(
       (res) => res?.user ?? null
     ),
+
+  getStats: () => request<UserStats>('/portal/api/stats'),
 
   generatePairingCode: (expirySeconds?: number) =>
     request<PairingCode>('/portal/api/pairing/generate', {

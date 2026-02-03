@@ -73,6 +73,16 @@ func (m *mockInboundRepo) CountByStatus(ctx context.Context, status model.Inboun
 	return args.Int(0), args.Error(1)
 }
 
+func (m *mockInboundRepo) CountByAccountIDAndStatus(ctx context.Context, accountID string, status model.InboundMessageStatus) (int, error) {
+	args := m.Called(ctx, accountID, status)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *mockInboundRepo) CountByAccountIDSince(ctx context.Context, accountID string, since time.Time) (int, error) {
+	args := m.Called(ctx, accountID, since)
+	return args.Int(0), args.Error(1)
+}
+
 type mockOutboundRepo struct {
 	mock.Mock
 }
@@ -118,7 +128,24 @@ func (m *mockOutboundRepo) MarkFailed(ctx context.Context, id string, errorMsg s
 	return args.Error(0)
 }
 
-// Mock Kakao service
+func (m *mockOutboundRepo) CountByAccountIDAndStatus(ctx context.Context, accountID string, status model.OutboundMessageStatus) (int, error) {
+	args := m.Called(ctx, accountID, status)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *mockOutboundRepo) CountByAccountIDSince(ctx context.Context, accountID string, since time.Time) (int, error) {
+	args := m.Called(ctx, accountID, since)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *mockOutboundRepo) FindRecentFailedByAccountID(ctx context.Context, accountID string, limit int) ([]model.OutboundMessage, error) {
+	args := m.Called(ctx, accountID, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.OutboundMessage), args.Error(1)
+}
+
 type mockKakaoService struct {
 	mock.Mock
 }

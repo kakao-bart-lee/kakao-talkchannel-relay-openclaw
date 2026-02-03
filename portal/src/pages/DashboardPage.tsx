@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Unlink, ShieldBan, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Unlink, ShieldBan, ShieldCheck, RefreshCw, AlertCircle, CheckCircle2, MessageSquare, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { api, type Connection } from '../lib/api';
+import { api, type Connection, type UserStats } from '../lib/api';
 
 type FilterType = 'all' | 'paired' | 'blocked';
 
@@ -14,6 +14,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const loadConnections = async () => {
     try {
@@ -26,8 +28,23 @@ export default function DashboardPage() {
     }
   };
 
+  const loadStats = async () => {
+    try {
+      const data = await api.getStats();
+      setStats(data);
+    } catch (error) {
+      console.error('Failed to load stats', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadConnections();
+    loadStats();
+
+    const interval = setInterval(loadStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const filteredConnections = useMemo(() => {
@@ -115,6 +132,27 @@ export default function DashboardPage() {
     );
   }
 
+  const getHealthStatus = () => {
+    if (!stats) return { status: 'unknown', color: 'text-muted-foreground', label: '확인 중...' };
+    
+    const hasErrors = stats.messages.outbound.failed > 0;
+    const hasQueued = stats.messages.inbound.queued > 5;
+    const hasConnections = stats.connections.paired > 0;
+    
+    if (hasErrors) {
+      return { status: 'warning', color: 'text-yellow-500', label: '주의 필요' };
+    }
+    if (!hasConnections) {
+      return { status: 'inactive', color: 'text-muted-foreground', label: '연결 없음' };
+    }
+    if (hasQueued) {
+      return { status: 'busy', color: 'text-blue-500', label: '처리 중' };
+    }
+    return { status: 'healthy', color: 'text-green-500', label: '정상' };
+  };
+
+  const healthStatus = getHealthStatus();
+
   return (
     <div className="space-y-6">
       <div>
@@ -132,6 +170,129 @@ export default function DashboardPage() {
           {' '}혹은 카카오톡에서 'samantha' 검색
         </p>
       </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">상태</p>
+                <p className={`text-2xl font-bold ${healthStatus.color}`}>
+                  {healthStatus.label}
+                </p>
+              </div>
+              {healthStatus.status === 'healthy' ? (
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
+              ) : healthStatus.status === 'warning' ? (
+                <AlertCircle className="h-8 w-8 text-yellow-500" />
+              ) : (
+                <MessageSquare className="h-8 w-8 text-muted-foreground" />
+              )}
+            </div>
+            {stats?.lastActivity && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                마지막 활동: {new Date(stats.lastActivity).toLocaleString('ko-KR')}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">오늘 수신</p>
+                <p className="text-2xl font-bold">
+                  {statsLoading ? '-' : stats?.messages.inbound.today ?? 0}
+                </p>
+              </div>
+              <ArrowDownToLine className="h-8 w-8 text-blue-500" />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              전체: {stats?.messages.inbound.total ?? 0}개
+              {(stats?.messages.inbound.queued ?? 0) > 0 && (
+                <span className="ml-2 text-yellow-600">
+                  (대기 중 {stats?.messages.inbound.queued}개)
+                </span>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">오늘 발신</p>
+                <p className="text-2xl font-bold">
+                  {statsLoading ? '-' : stats?.messages.outbound.today ?? 0}
+                </p>
+              </div>
+              <ArrowUpFromLine className="h-8 w-8 text-green-500" />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              전체: {stats?.messages.outbound.total ?? 0}개
+              {(stats?.messages.outbound.failed ?? 0) > 0 && (
+                <span className="ml-2 text-red-500">
+                  (실패 {stats?.messages.outbound.failed}개)
+                </span>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">연결</p>
+                <p className="text-2xl font-bold">
+                  {statsLoading ? '-' : stats?.connections.paired ?? 0}
+                </p>
+              </div>
+              <MessageSquare className="h-8 w-8 text-primary" />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              전체: {stats?.connections.total ?? 0}개
+              {(stats?.connections.blocked ?? 0) > 0 && (
+                <span className="ml-2 text-muted-foreground">
+                  (차단 {stats?.connections.blocked}개)
+                </span>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {stats && stats.recentErrors.length > 0 && (
+        <Card className="border-destructive/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              최근 오류
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {stats.recentErrors.map((error) => (
+                <div
+                  key={error.id}
+                  className="flex items-start justify-between rounded-md bg-destructive/5 p-2 text-sm"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-destructive">
+                      {error.errorMessage || '알 수 없는 오류'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {error.conversationKey} · {new Date(error.createdAt).toLocaleString('ko-KR')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Pairing Code Card */}
@@ -182,7 +343,7 @@ export default function DashboardPage() {
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </div>
-            <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
+            <Tabs defaultValue="all" value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="all">전체</TabsTrigger>
                 <TabsTrigger value="paired">활성</TabsTrigger>
