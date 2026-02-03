@@ -2,8 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -34,13 +32,7 @@ func (r *pairingCodeRepo) FindByCode(ctx context.Context, code string) (*model.P
 		SELECT * FROM pairing_codes
 		WHERE code = $1 AND used_at IS NULL AND expires_at > NOW()
 	`, code)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &pc, nil
+	return HandleNotFound(&pc, err)
 }
 
 func (r *pairingCodeRepo) FindActiveByAccountID(ctx context.Context, accountID string) ([]model.PairingCode, error) {

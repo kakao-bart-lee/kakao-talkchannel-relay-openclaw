@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -221,13 +222,9 @@ func (s *MessageService) GetMessageHistory(ctx context.Context, params MessageHi
 		}
 
 		// Sort by created_at descending
-		for i := 0; i < len(messages)-1; i++ {
-			for j := i + 1; j < len(messages); j++ {
-				if messages[j].CreatedAt.After(messages[i].CreatedAt) {
-					messages[i], messages[j] = messages[j], messages[i]
-				}
-			}
-		}
+		sort.Slice(messages, func(i, j int) bool {
+			return messages[i].CreatedAt.After(messages[j].CreatedAt)
+		})
 
 		// Limit results
 		if len(messages) > params.Limit {

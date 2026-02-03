@@ -2,8 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -34,13 +32,7 @@ func NewInboundMessageRepository(db *sqlx.DB) InboundMessageRepository {
 func (r *inboundMessageRepo) FindByID(ctx context.Context, id string) (*model.InboundMessage, error) {
 	var msg model.InboundMessage
 	err := r.db.GetContext(ctx, &msg, `SELECT * FROM inbound_messages WHERE id = $1`, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &msg, nil
+	return HandleNotFound(&msg, err)
 }
 
 func (r *inboundMessageRepo) FindQueuedByAccountID(ctx context.Context, accountID string) ([]model.InboundMessage, error) {
@@ -153,13 +145,7 @@ func NewOutboundMessageRepository(db *sqlx.DB) OutboundMessageRepository {
 func (r *outboundMessageRepo) FindByID(ctx context.Context, id string) (*model.OutboundMessage, error) {
 	var msg model.OutboundMessage
 	err := r.db.GetContext(ctx, &msg, `SELECT * FROM outbound_messages WHERE id = $1`, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &msg, nil
+	return HandleNotFound(&msg, err)
 }
 
 func (r *outboundMessageRepo) FindPendingByAccountID(ctx context.Context, accountID string) ([]model.OutboundMessage, error) {

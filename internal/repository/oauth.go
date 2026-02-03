@@ -2,8 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -34,13 +32,7 @@ func (r *oauthAccountRepo) FindByProviderAndUserID(ctx context.Context, provider
 		SELECT * FROM oauth_accounts
 		WHERE provider = $1 AND provider_user_id = $2
 	`, provider, providerUserID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &account, nil
+	return HandleNotFound(&account, err)
 }
 
 func (r *oauthAccountRepo) FindByUserID(ctx context.Context, userID string) ([]*model.OAuthAccount, error) {
@@ -111,13 +103,7 @@ func (r *oauthStateRepo) FindByState(ctx context.Context, state string) (*model.
 		SELECT * FROM oauth_states
 		WHERE state = $1 AND expires_at > NOW()
 	`, state)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &oauthState, nil
+	return HandleNotFound(&oauthState, err)
 }
 
 func (r *oauthStateRepo) Create(ctx context.Context, params model.CreateOAuthStateParams) (*model.OAuthState, error) {

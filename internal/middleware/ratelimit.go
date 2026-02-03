@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+
+	"github.com/openclaw/relay-server-go/internal/config"
 )
 
 const (
@@ -128,7 +130,7 @@ func (m *RateLimitMiddleware) Handler(next http.Handler) http.Handler {
 
 		limit := account.RateLimitPerMin
 		if limit <= 0 {
-			limit = 60
+			limit = config.DefaultRateLimitPerMin
 		}
 
 		allowed, remaining, resetAt := m.limiter.Check(account.ID, limit)

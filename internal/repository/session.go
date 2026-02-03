@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -49,13 +48,7 @@ func (r *sessionRepo) FindByID(ctx context.Context, id string) (*model.Session, 
 	err := r.db.GetContext(ctx, &session, `
 		SELECT * FROM sessions WHERE id = $1
 	`, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &session, nil
+	return HandleNotFound(&session, err)
 }
 
 func (r *sessionRepo) FindByTokenHash(ctx context.Context, tokenHash string) (*model.Session, error) {
@@ -65,13 +58,7 @@ func (r *sessionRepo) FindByTokenHash(ctx context.Context, tokenHash string) (*m
 		WHERE session_token_hash = $1
 		AND status IN ('pending_pairing', 'paired')
 	`, tokenHash)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &session, nil
+	return HandleNotFound(&session, err)
 }
 
 func (r *sessionRepo) FindByPairingCode(ctx context.Context, code string) (*model.Session, error) {
@@ -82,13 +69,7 @@ func (r *sessionRepo) FindByPairingCode(ctx context.Context, code string) (*mode
 		AND status = 'pending_pairing'
 		AND expires_at > NOW()
 	`, code)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &session, nil
+	return HandleNotFound(&session, err)
 }
 
 func (r *sessionRepo) Create(ctx context.Context, params model.CreateSessionParams) (*model.Session, error) {
