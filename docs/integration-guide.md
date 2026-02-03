@@ -34,7 +34,7 @@
 
 **Admin UI 사용:**
 ```
-URL: https://kakao-talkchannel-relay-{PROJECT_NUMBER}.asia-northeast3.run.app/admin/
+URL: https://{YOUR_RELAY_SERVER}/admin/
 메뉴: Accounts → Create Account
 ```
 
@@ -64,7 +64,7 @@ curl -X POST https://kakao-talkchannel-relay-....run.app/admin/api/accounts \
 1. 채널 설정 → 챗봇 → 스킬 설정
 2. 웹훅 URL 등록:
    ```
-   https://kakao-talkchannel-relay-{PROJECT_NUMBER}.asia-northeast3.run.app/kakao-talkchannel/webhook
+   https://{YOUR_RELAY_SERVER}/kakao-talkchannel/webhook
    ```
 3. (선택) 서명 검증 활성화 시 `KAKAO_SIGNATURE_SECRET` 환경변수 설정
 
@@ -75,7 +75,7 @@ curl -X POST https://kakao-talkchannel-relay-....run.app/admin/api/accounts \
 #### 2-1. 환경변수 설정
 
 ```env
-KAKAO_RELAY_URL=https://kakao-talkchannel-relay-{PROJECT_NUMBER}.asia-northeast3.run.app
+KAKAO_RELAY_URL=https://{YOUR_RELAY_SERVER}
 KAKAO_RELAY_TOKEN=<발급받은_64자_토큰>
 ```
 
@@ -352,6 +352,8 @@ Authorization: Bearer <relay_token>
 
 ## 서비스 URL
 
-- **릴레이 서버**: https://kakao-talkchannel-relay-{PROJECT_NUMBER}.asia-northeast3.run.app
-- **Admin UI**: https://kakao-talkchannel-relay-{PROJECT_NUMBER}.asia-northeast3.run.app/admin/
-- **Health Check**: https://kakao-talkchannel-relay-{PROJECT_NUMBER}.asia-northeast3.run.app/health
+배포 후 생성되는 URL을 사용합니다:
+
+- **릴레이 서버**: `https://{YOUR_RELAY_SERVER}`
+- **Admin UI**: `https://{YOUR_RELAY_SERVER}/admin/`
+- **Health Check**: `https://{YOUR_RELAY_SERVER}/health`
