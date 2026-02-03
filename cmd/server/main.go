@@ -91,7 +91,7 @@ func main() {
 	sessionService := service.NewSessionService(db, sessionRepo, accountRepo, broker)
 
 	authMiddleware := middleware.NewAuthMiddleware(accountRepo, sessionRepo)
-	rateLimitMiddleware := middleware.NewRateLimitMiddleware()
+	rateLimitMiddleware := middleware.NewRedisRateLimitMiddleware(redisClient.Client)
 	adminSessionMiddleware := middleware.NewAdminSessionMiddleware(
 		adminSessionRepo, cfg.AdminPassword, cfg.AdminSessionSecret,
 	)
@@ -100,6 +100,7 @@ func main() {
 	isProduction := os.Getenv("FLY_APP_NAME") != ""
 	csrfMiddleware := middleware.NewCSRFMiddleware(isProduction)
 	bodyLimitMiddleware := middleware.NewBodyLimitMiddleware(0)
+	securityHeadersMiddleware := middleware.NewSecurityHeadersMiddleware(isProduction)
 
 	kakaoHandler := handler.NewKakaoHandler(
 		convService, sessionService, messageService, broker, cfg.CallbackTTL(),
@@ -157,12 +158,14 @@ func main() {
 	})
 
 	r.Route("/admin", func(r chi.Router) {
+		r.Use(securityHeadersMiddleware.Handler)
 		r.Use(csrfMiddleware.Handler)
 		r.Mount("/", adminHandler.Routes())
 		r.NotFound(handler.StaticFileServer("static/admin", "/admin").ServeHTTP)
 	})
 
 	r.Route("/portal", func(r chi.Router) {
+		r.Use(securityHeadersMiddleware.Handler)
 		r.Use(csrfMiddleware.Handler)
 		r.Mount("/", portalHandler.Routes())
 		r.Mount("/api/oauth", oauthHandler.Routes())

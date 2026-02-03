@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 
+	"github.com/openclaw/relay-server-go/internal/audit"
 	"github.com/openclaw/relay-server-go/internal/middleware"
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/service"
@@ -90,9 +91,23 @@ func (h *AdminHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if token == "" {
+		audit.LogFromRequest(r, audit.Event{
+			Type: audit.EventLoginFailure,
+			Details: map[string]interface{}{
+				"reason": "invalid_password",
+				"target": "admin",
+			},
+		})
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Invalid password"})
 		return
 	}
+
+	audit.LogFromRequest(r, audit.Event{
+		Type: audit.EventLoginSuccess,
+		Details: map[string]interface{}{
+			"target": "admin",
+		},
+	})
 
 	middleware.SetSessionCookie(w, middleware.AdminSessionCookie, token, "/admin", h.isProduction)
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
@@ -103,6 +118,13 @@ func (h *AdminHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if err == nil && cookie.Value != "" {
 		h.adminService.Logout(r.Context(), cookie.Value)
 	}
+
+	audit.LogFromRequest(r, audit.Event{
+		Type: audit.EventLogout,
+		Details: map[string]interface{}{
+			"target": "admin",
+		},
+	})
 
 	middleware.ClearSessionCookie(w, middleware.AdminSessionCookie, "/admin")
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
@@ -200,6 +222,14 @@ func (h *AdminHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	audit.LogFromRequest(r, audit.Event{
+		Type:      audit.EventAccountDelete,
+		AccountID: id,
+		Details: map[string]interface{}{
+			"deleted_by": "admin",
+		},
+	})
+
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
@@ -212,6 +242,14 @@ func (h *AdminHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 		return
 	}
+
+	audit.LogFromRequest(r, audit.Event{
+		Type:      audit.EventTokenRegenerate,
+		AccountID: id,
+		Details: map[string]interface{}{
+			"regenerated_by": "admin",
+		},
+	})
 
 	writeJSON(w, http.StatusOK, map[string]string{"relayToken": token})
 }
@@ -377,6 +415,14 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 		return
 	}
+
+	audit.LogFromRequest(r, audit.Event{
+		Type:   audit.EventUserDelete,
+		UserID: id,
+		Details: map[string]interface{}{
+			"deleted_by": "admin",
+		},
+	})
 
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 }

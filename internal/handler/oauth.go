@@ -6,15 +6,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 
+	"github.com/openclaw/relay-server-go/internal/audit"
 	"github.com/openclaw/relay-server-go/internal/middleware"
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/service"
 )
 
 type OAuthHandler struct {
-	oauthService   *service.OAuthService
-	portalService  *service.PortalService
-	isProduction   bool
+	oauthService  *service.OAuthService
+	portalService *service.PortalService
+	isProduction  bool
 }
 
 func NewOAuthHandler(
@@ -83,6 +84,14 @@ func (h *OAuthHandler) TwitterCallback(w http.ResponseWriter, r *http.Request) {
 func (h *OAuthHandler) handleOAuthCallback(w http.ResponseWriter, r *http.Request, provider string) {
 	if errMsg := r.URL.Query().Get("error"); errMsg != "" {
 		log.Warn().Str("error", errMsg).Str("provider", provider).Msg("OAuth error from provider")
+		audit.LogFromRequest(r, audit.Event{
+			Type: audit.EventLoginFailure,
+			Details: map[string]interface{}{
+				"provider": provider,
+				"reason":   "oauth_denied",
+				"error":    errMsg,
+			},
+		})
 		http.Redirect(w, r, "/portal/auth?error=oauth_denied", http.StatusTemporaryRedirect)
 		return
 	}
@@ -91,6 +100,13 @@ func (h *OAuthHandler) handleOAuthCallback(w http.ResponseWriter, r *http.Reques
 	state := r.URL.Query().Get("state")
 
 	if code == "" || state == "" {
+		audit.LogFromRequest(r, audit.Event{
+			Type: audit.EventLoginFailure,
+			Details: map[string]interface{}{
+				"provider": provider,
+				"reason":   "missing_params",
+			},
+		})
 		http.Redirect(w, r, "/portal/auth?error=missing_params", http.StatusTemporaryRedirect)
 		return
 	}
@@ -98,6 +114,17 @@ func (h *OAuthHandler) handleOAuthCallback(w http.ResponseWriter, r *http.Reques
 	user, token, err := h.oauthService.HandleCallback(r.Context(), provider, code, state)
 	if err != nil {
 		log.Error().Err(err).Str("provider", provider).Msg("OAuth callback failed")
+		reason := "oauth_failed"
+		if err == service.ErrInvalidState {
+			reason = "invalid_state"
+		}
+		audit.LogFromRequest(r, audit.Event{
+			Type: audit.EventLoginFailure,
+			Details: map[string]interface{}{
+				"provider": provider,
+				"reason":   reason,
+			},
+		})
 		if err == service.ErrInvalidState {
 			http.Redirect(w, r, "/portal/auth?error=invalid_state", http.StatusTemporaryRedirect)
 			return
@@ -105,6 +132,15 @@ func (h *OAuthHandler) handleOAuthCallback(w http.ResponseWriter, r *http.Reques
 		http.Redirect(w, r, "/portal/auth?error=oauth_failed", http.StatusTemporaryRedirect)
 		return
 	}
+
+	audit.LogFromRequest(r, audit.Event{
+		Type:      audit.EventOAuthLogin,
+		UserID:    user.ID,
+		AccountID: user.AccountID,
+		Details: map[string]interface{}{
+			"provider": provider,
+		},
+	})
 
 	middleware.SetSessionCookie(w, middleware.PortalSessionCookie, token, "/portal", h.isProduction)
 
@@ -163,6 +199,15 @@ func (h *OAuthHandler) UnlinkProvider(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to unlink provider"})
 		return
 	}
+
+	audit.LogFromRequest(r, audit.Event{
+		Type:      audit.EventOAuthUnlink,
+		UserID:    user.ID,
+		AccountID: user.AccountID,
+		Details: map[string]interface{}{
+			"provider": provider,
+		},
+	})
 
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
