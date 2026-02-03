@@ -70,7 +70,7 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Send queued messages only if we have an account
 	if accountID != "" {
-		if err := h.sendQueuedMessages(w, flusher, accountID); err != nil {
+		if err := h.sendQueuedMessages(ctx, w, flusher, accountID); err != nil {
 			log.Error().Err(err).Msg("failed to send queued messages")
 		}
 	}
@@ -126,8 +126,8 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *EventsHandler) sendQueuedMessages(w http.ResponseWriter, flusher http.Flusher, accountID string) error {
-	messages, err := h.messageService.FindQueuedByAccountID(context.Background(), accountID)
+func (h *EventsHandler) sendQueuedMessages(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, accountID string) error {
+	messages, err := h.messageService.FindQueuedByAccountID(ctx, accountID)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (h *EventsHandler) sendQueuedMessages(w http.ResponseWriter, flusher http.F
 			return err
 		}
 
-		if err := h.messageService.MarkDelivered(context.Background(), msg.ID); err != nil {
+		if err := h.messageService.MarkDelivered(ctx, msg.ID); err != nil {
 			log.Warn().Err(err).Str("messageId", msg.ID).Msg("failed to mark message as delivered")
 		}
 	}
@@ -182,4 +182,3 @@ func (h *EventsHandler) sendRawEvent(w http.ResponseWriter, flusher http.Flusher
 	flusher.Flush()
 	return nil
 }
-

@@ -2,8 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/jmoiron/sqlx"
 
@@ -32,13 +30,7 @@ func (r *adminSessionRepo) FindByTokenHash(ctx context.Context, tokenHash string
 		SELECT * FROM admin_sessions
 		WHERE token_hash = $1 AND expires_at > NOW()
 	`, tokenHash)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &session, nil
+	return HandleNotFound(&session, err)
 }
 
 func (r *adminSessionRepo) Create(ctx context.Context, params model.CreateAdminSessionParams) (*model.AdminSession, error) {

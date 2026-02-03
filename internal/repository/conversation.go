@@ -2,8 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -35,13 +33,7 @@ func (r *conversationRepo) FindByKey(ctx context.Context, key string) (*model.Co
 	err := r.db.GetContext(ctx, &conv, `
 		SELECT * FROM conversation_mappings WHERE conversation_key = $1
 	`, key)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &conv, nil
+	return HandleNotFound(&conv, err)
 }
 
 func (r *conversationRepo) FindByAccountID(ctx context.Context, accountID string) ([]model.ConversationMapping, error) {

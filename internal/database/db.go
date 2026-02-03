@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+
+	"github.com/openclaw/relay-server-go/internal/config"
 )
 
 // DBTX is an interface that both *sqlx.DB and *sqlx.Tx satisfy.
@@ -33,9 +34,9 @@ func Connect(databaseURL string) (*DB, error) {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetMaxOpenConns(config.DBMaxOpenConns)
+	db.SetMaxIdleConns(config.DBMaxIdleConns)
+	db.SetConnMaxLifetime(config.DBConnMaxLifetime)
 
 	return &DB{db}, nil
 }

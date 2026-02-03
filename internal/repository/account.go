@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -48,13 +47,7 @@ func (r *accountRepo) FindByID(ctx context.Context, id string) (*model.Account, 
 	err := r.db.GetContext(ctx, &account, `
 		SELECT * FROM accounts WHERE id = $1
 	`, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &account, nil
+	return HandleNotFound(&account, err)
 }
 
 func (r *accountRepo) FindByTokenHash(ctx context.Context, tokenHash string) (*model.Account, error) {
@@ -63,13 +56,7 @@ func (r *accountRepo) FindByTokenHash(ctx context.Context, tokenHash string) (*m
 		SELECT * FROM accounts
 		WHERE relay_token_hash = $1 AND disabled_at IS NULL
 	`, tokenHash)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &account, nil
+	return HandleNotFound(&account, err)
 }
 
 func (r *accountRepo) FindAll(ctx context.Context, limit, offset int) ([]model.Account, error) {
@@ -110,13 +97,7 @@ func (r *accountRepo) Update(ctx context.Context, id string, params model.Update
 		WHERE id = $1
 		RETURNING *
 	`, id, params.OpenclawUserID, params.Mode, params.RateLimitPerMin, params.DisabledAt, time.Now())
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &account, nil
+	return HandleNotFound(&account, err)
 }
 
 func (r *accountRepo) Delete(ctx context.Context, id string) error {
@@ -140,11 +121,5 @@ func (r *accountRepo) UpdateToken(ctx context.Context, id, token, tokenHash stri
 		WHERE id = $1
 		RETURNING *
 	`, id, token, tokenHash, time.Now())
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &account, nil
+	return HandleNotFound(&account, err)
 }

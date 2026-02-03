@@ -2,8 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -30,25 +28,13 @@ func NewPortalUserRepository(db *sqlx.DB) PortalUserRepository {
 func (r *portalUserRepo) FindByID(ctx context.Context, id string) (*model.PortalUser, error) {
 	var user model.PortalUser
 	err := r.db.GetContext(ctx, &user, `SELECT * FROM portal_users WHERE id = $1`, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
+	return HandleNotFound(&user, err)
 }
 
 func (r *portalUserRepo) FindByEmail(ctx context.Context, email string) (*model.PortalUser, error) {
 	var user model.PortalUser
 	err := r.db.GetContext(ctx, &user, `SELECT * FROM portal_users WHERE email = $1`, email)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
+	return HandleNotFound(&user, err)
 }
 
 func (r *portalUserRepo) Create(ctx context.Context, params model.CreatePortalUserParams) (*model.PortalUser, error) {
@@ -100,13 +86,7 @@ func (r *portalSessionRepo) FindByTokenHash(ctx context.Context, tokenHash strin
 		SELECT * FROM portal_sessions
 		WHERE token_hash = $1 AND expires_at > NOW()
 	`, tokenHash)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &session, nil
+	return HandleNotFound(&session, err)
 }
 
 func (r *portalSessionRepo) Create(ctx context.Context, params model.CreatePortalSessionParams) (*model.PortalSession, error) {
