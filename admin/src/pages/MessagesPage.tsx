@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, InboundMessage, OutboundMessage } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -9,7 +9,7 @@ import { Search } from 'lucide-react';
 
 export function MessagesPage() {
   const [activeTab, setActiveTab] = useState('inbound');
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<(InboundMessage | OutboundMessage)[]>([]);
   const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
@@ -128,7 +128,16 @@ export function MessagesPage() {
   );
 }
 
-function MessageTable({ messages, loading, type }: { messages: any[], loading: boolean, type: string }) {
+interface MessageRow {
+  id: string;
+  accountId: string;
+  kakaoUserId?: string;
+  content: string;
+  status: string;
+  createdAt: string;
+}
+
+function MessageTable({ messages, loading, type }: { messages: MessageRow[], loading: boolean, type: string }) {
   return (
     <div className="rounded-md border">
       <Table>
