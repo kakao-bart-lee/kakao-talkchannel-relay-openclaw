@@ -129,6 +129,139 @@ type MessageHistoryItem struct {
 	CreatedAt       time.Time        `json:"createdAt"`
 }
 
+// UserStats represents statistics for a user's account
+type UserStats struct {
+	Connections struct {
+		Total   int `json:"total"`
+		Paired  int `json:"paired"`
+		Blocked int `json:"blocked"`
+	} `json:"connections"`
+	Messages struct {
+		Inbound struct {
+			Today   int `json:"today"`
+			Total   int `json:"total"`
+			Queued  int `json:"queued"`
+			Expired int `json:"expired"`
+		} `json:"inbound"`
+		Outbound struct {
+			Today  int `json:"today"`
+			Total  int `json:"total"`
+			Sent   int `json:"sent"`
+			Failed int `json:"failed"`
+		} `json:"outbound"`
+	} `json:"messages"`
+	RecentErrors []RecentError `json:"recentErrors"`
+	LastActivity *time.Time    `json:"lastActivity"`
+}
+
+// RecentError represents a recent failed message
+type RecentError struct {
+	ID              string    `json:"id"`
+	ConversationKey string    `json:"conversationKey"`
+	ErrorMessage    string    `json:"errorMessage"`
+	CreatedAt       time.Time `json:"createdAt"`
+}
+
+// GetUserStats returns statistics for a specific account
+func (s *MessageService) GetUserStats(ctx context.Context, accountID string, connections []ConnectionStat) (*UserStats, error) {
+	stats := &UserStats{}
+
+	for _, conn := range connections {
+		stats.Connections.Total++
+		switch conn.State {
+		case "paired":
+			stats.Connections.Paired++
+		case "blocked":
+			stats.Connections.Blocked++
+		}
+	}
+
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	inboundTotal, err := s.inboundRepo.CountByAccountID(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("count inbound messages: %w", err)
+	}
+	stats.Messages.Inbound.Total = inboundTotal
+
+	inboundToday, err := s.inboundRepo.CountByAccountIDSince(ctx, accountID, todayStart)
+	if err != nil {
+		return nil, fmt.Errorf("count inbound messages today: %w", err)
+	}
+	stats.Messages.Inbound.Today = inboundToday
+
+	queuedCount, err := s.inboundRepo.CountByAccountIDAndStatus(ctx, accountID, model.InboundStatusQueued)
+	if err != nil {
+		return nil, fmt.Errorf("count queued messages: %w", err)
+	}
+	stats.Messages.Inbound.Queued = queuedCount
+
+	expiredCount, err := s.inboundRepo.CountByAccountIDAndStatus(ctx, accountID, model.InboundStatusExpired)
+	if err != nil {
+		return nil, fmt.Errorf("count expired messages: %w", err)
+	}
+	stats.Messages.Inbound.Expired = expiredCount
+
+	outboundTotal, err := s.outboundRepo.CountByAccountID(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("count outbound messages: %w", err)
+	}
+	stats.Messages.Outbound.Total = outboundTotal
+
+	outboundToday, err := s.outboundRepo.CountByAccountIDSince(ctx, accountID, todayStart)
+	if err != nil {
+		return nil, fmt.Errorf("count outbound messages today: %w", err)
+	}
+	stats.Messages.Outbound.Today = outboundToday
+
+	sentCount, err := s.outboundRepo.CountByAccountIDAndStatus(ctx, accountID, model.OutboundStatusSent)
+	if err != nil {
+		return nil, fmt.Errorf("count sent messages: %w", err)
+	}
+	stats.Messages.Outbound.Sent = sentCount
+
+	failedCount, err := s.outboundRepo.CountByAccountIDAndStatus(ctx, accountID, model.OutboundStatusFailed)
+	if err != nil {
+		return nil, fmt.Errorf("count failed messages: %w", err)
+	}
+	stats.Messages.Outbound.Failed = failedCount
+
+	failedMsgs, err := s.outboundRepo.FindRecentFailedByAccountID(ctx, accountID, 5)
+	if err != nil {
+		return nil, fmt.Errorf("find recent errors: %w", err)
+	}
+	stats.RecentErrors = make([]RecentError, len(failedMsgs))
+	for i, msg := range failedMsgs {
+		errorMsg := ""
+		if msg.ErrorMessage != nil {
+			errorMsg = *msg.ErrorMessage
+		}
+		stats.RecentErrors[i] = RecentError{
+			ID:              msg.ID,
+			ConversationKey: msg.ConversationKey,
+			ErrorMessage:    errorMsg,
+			CreatedAt:       msg.CreatedAt,
+		}
+	}
+
+	for _, conn := range connections {
+		if conn.LastSeenAt != nil {
+			if stats.LastActivity == nil || conn.LastSeenAt.After(*stats.LastActivity) {
+				stats.LastActivity = conn.LastSeenAt
+			}
+		}
+	}
+
+	return stats, nil
+}
+
+// ConnectionStat is used for passing connection info to GetUserStats
+type ConnectionStat struct {
+	State      string
+	LastSeenAt *time.Time
+}
+
 func (s *MessageService) GetMessageHistory(ctx context.Context, params MessageHistoryParams) (*MessageHistoryResult, error) {
 	var messages []MessageHistoryItem
 	var total int

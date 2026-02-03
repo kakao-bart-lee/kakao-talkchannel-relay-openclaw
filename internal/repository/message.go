@@ -19,6 +19,8 @@ type InboundMessageRepository interface {
 	MarkAcked(ctx context.Context, id string) error
 	MarkExpired(ctx context.Context) (int64, error)
 	CountByStatus(ctx context.Context, status model.InboundMessageStatus) (int, error)
+	CountByAccountIDAndStatus(ctx context.Context, accountID string, status model.InboundMessageStatus) (int, error)
+	CountByAccountIDSince(ctx context.Context, accountID string, since time.Time) (int, error)
 }
 
 type inboundMessageRepo struct {
@@ -122,6 +124,22 @@ func (r *inboundMessageRepo) CountByStatus(ctx context.Context, status model.Inb
 	return count, err
 }
 
+func (r *inboundMessageRepo) CountByAccountIDAndStatus(ctx context.Context, accountID string, status model.InboundMessageStatus) (int, error) {
+	var count int
+	err := r.db.GetContext(ctx, &count, `
+		SELECT COUNT(*) FROM inbound_messages WHERE account_id = $1 AND status = $2
+	`, accountID, status)
+	return count, err
+}
+
+func (r *inboundMessageRepo) CountByAccountIDSince(ctx context.Context, accountID string, since time.Time) (int, error) {
+	var count int
+	err := r.db.GetContext(ctx, &count, `
+		SELECT COUNT(*) FROM inbound_messages WHERE account_id = $1 AND created_at >= $2
+	`, accountID, since)
+	return count, err
+}
+
 // Outbound Message Repository
 
 type OutboundMessageRepository interface {
@@ -132,6 +150,9 @@ type OutboundMessageRepository interface {
 	Create(ctx context.Context, params model.CreateOutboundMessageParams) (*model.OutboundMessage, error)
 	MarkSent(ctx context.Context, id string) error
 	MarkFailed(ctx context.Context, id string, errorMsg string) error
+	CountByAccountIDAndStatus(ctx context.Context, accountID string, status model.OutboundMessageStatus) (int, error)
+	CountByAccountIDSince(ctx context.Context, accountID string, since time.Time) (int, error)
+	FindRecentFailedByAccountID(ctx context.Context, accountID string, limit int) ([]model.OutboundMessage, error)
 }
 
 type outboundMessageRepo struct {
@@ -210,4 +231,31 @@ func (r *outboundMessageRepo) MarkFailed(ctx context.Context, id string, errorMs
 		WHERE id = $1
 	`, id, errorMsg)
 	return err
+}
+
+func (r *outboundMessageRepo) CountByAccountIDAndStatus(ctx context.Context, accountID string, status model.OutboundMessageStatus) (int, error) {
+	var count int
+	err := r.db.GetContext(ctx, &count, `
+		SELECT COUNT(*) FROM outbound_messages WHERE account_id = $1 AND status = $2
+	`, accountID, status)
+	return count, err
+}
+
+func (r *outboundMessageRepo) CountByAccountIDSince(ctx context.Context, accountID string, since time.Time) (int, error) {
+	var count int
+	err := r.db.GetContext(ctx, &count, `
+		SELECT COUNT(*) FROM outbound_messages WHERE account_id = $1 AND created_at >= $2
+	`, accountID, since)
+	return count, err
+}
+
+func (r *outboundMessageRepo) FindRecentFailedByAccountID(ctx context.Context, accountID string, limit int) ([]model.OutboundMessage, error) {
+	var msgs []model.OutboundMessage
+	err := r.db.SelectContext(ctx, &msgs, `
+		SELECT * FROM outbound_messages
+		WHERE account_id = $1 AND status = 'failed'
+		ORDER BY created_at DESC
+		LIMIT $2
+	`, accountID, limit)
+	return msgs, err
 }

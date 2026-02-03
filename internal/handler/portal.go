@@ -43,6 +43,7 @@ func (h *PortalHandler) Routes() chi.Router {
 
 	r.Post("/api/logout", h.Logout)
 	r.Get("/api/me", h.Me)
+	r.Get("/api/stats", h.GetStats)
 	r.Post("/api/pairing/generate", h.GeneratePairingCode)
 	r.Get("/api/connections", h.ListConnections)
 	r.Post("/api/connections/{conversationKey}/unpair", h.UnpairConnection)
@@ -94,6 +95,39 @@ func (h *PortalHandler) Me(w http.ResponseWriter, r *http.Request) {
 			"createdAt": user.CreatedAt.Format(time.RFC3339),
 		},
 	})
+}
+
+func (h *PortalHandler) GetStats(w http.ResponseWriter, r *http.Request) {
+	user := h.getSessionUser(r)
+	if user == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
+		return
+	}
+
+	conversations, err := h.convService.ListByAccountID(r.Context(), user.AccountID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list connections for stats")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	connStats := make([]service.ConnectionStat, len(conversations))
+	for i, conv := range conversations {
+		lastSeenAt := conv.LastSeenAt
+		connStats[i] = service.ConnectionStat{
+			State:      string(conv.State),
+			LastSeenAt: &lastSeenAt,
+		}
+	}
+
+	stats, err := h.msgService.GetUserStats(r.Context(), user.AccountID, connStats)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get user stats")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
 }
 
 func (h *PortalHandler) GeneratePairingCode(w http.ResponseWriter, r *http.Request) {
