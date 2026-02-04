@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
+import { RefreshCw, ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -11,6 +12,7 @@ type MessageType = 'all' | 'inbound' | 'outbound';
 const LIMIT = 20;
 
 export default function MessagesPage() {
+  const { isCodeSession } = useOutletContext<{ isCodeSession?: boolean }>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function MessagesPage() {
       if (type !== 'all') {
         params.type = type;
       }
-      const data = await api.getMessages(params);
+      const data = isCodeSession ? await api.getCodeMessages(params) : await api.getMessages(params);
       setMessages(data.messages);
       setTotal(data.total);
       setHasMore(data.hasMore);
@@ -67,8 +69,20 @@ export default function MessagesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">메시지 히스토리</h1>
-          <p className="text-muted-foreground">송수신된 메시지 기록을 확인합니다.</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">메시지 히스토리</h1>
+            {isCodeSession && (
+              <Badge variant="secondary" className="flex gap-1">
+                <Shield className="h-3 w-3" />
+                읽기 전용 모드
+              </Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground">
+            {isCodeSession
+              ? '이 대화의 메시지 기록을 확인합니다.'
+              : '송수신된 메시지 기록을 확인합니다.'}
+          </p>
         </div>
         <Button variant="outline" onClick={loadMessages} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />

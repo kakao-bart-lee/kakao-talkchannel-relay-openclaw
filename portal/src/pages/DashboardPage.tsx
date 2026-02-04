@@ -1,20 +1,22 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Unlink, ShieldBan, ShieldCheck, RefreshCw, AlertCircle, CheckCircle2, MessageSquare, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { useOutletContext } from 'react-router-dom';
+import { Unlink, ShieldBan, ShieldCheck, RefreshCw, AlertCircle, CheckCircle2, MessageSquare, ArrowDownToLine, ArrowUpFromLine, Shield } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { api, type Connection, type UserStats } from '../lib/api';
+import { api, type Connection, type UserStats, type ConversationStats } from '../lib/api';
 
 type FilterType = 'all' | 'paired' | 'blocked';
 
 export default function DashboardPage() {
+  const { isCodeSession } = useOutletContext<{ isCodeSession?: boolean }>();
   const [connections, setConnections] = useState<Connection[]>([]);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [stats, setStats] = useState<UserStats | null>(null);
+  const [stats, setStats] = useState<UserStats | ConversationStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
   const loadConnections = async () => {
@@ -30,7 +32,7 @@ export default function DashboardPage() {
 
   const loadStats = async () => {
     try {
-      const data = await api.getStats();
+      const data = isCodeSession ? await api.getCodeStats() : await api.getStats();
       setStats(data);
     } catch (error) {
       console.error('Failed to load stats', error);
@@ -40,12 +42,16 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    loadConnections();
+    if (!isCodeSession) {
+      loadConnections();
+    } else {
+      setLoading(false);
+    }
     loadStats();
 
     const interval = setInterval(loadStats, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isCodeSession]);
 
   const filteredConnections = useMemo(() => {
     if (filter === 'all') return connections;
@@ -156,19 +162,34 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">대시보드</h1>
-        <p className="text-muted-foreground">
-          대화를 위한 채널 연결:{' '}
-          <a
-            href="http://pf.kakao.com/_scexbC"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-          >
-            http://pf.kakao.com/_scexbC
-          </a>
-          {' '}혹은 카카오톡에서 'samantha' 검색
-        </p>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">대시보드</h1>
+          {isCodeSession && (
+            <Badge variant="secondary" className="flex gap-1">
+              <Shield className="h-3 w-3" />
+              읽기 전용 모드
+            </Badge>
+          )}
+        </div>
+        {!isCodeSession && (
+          <p className="text-muted-foreground">
+            대화를 위한 채널 연결:{' '}
+            <a
+              href="http://pf.kakao.com/_scexbC"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              http://pf.kakao.com/_scexbC
+            </a>
+            {' '}혹은 카카오톡에서 'samantha' 검색
+          </p>
+        )}
+        {isCodeSession && (
+          <p className="text-muted-foreground">
+            코드로 접속하여 대화 내역과 통계를 조회하고 있습니다
+          </p>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -294,9 +315,10 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Pairing Code Card */}
-        <Card>
+      {!isCodeSession && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Pairing Code Card */}
+          <Card>
           <CardHeader>
             <CardTitle>페어링 코드</CardTitle>
             <CardDescription>
@@ -413,7 +435,8 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
