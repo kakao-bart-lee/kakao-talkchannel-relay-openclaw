@@ -55,7 +55,7 @@ func (h *PortalHandler) Routes() chi.Router {
 	r.Get("/api/code/stats", h.GetCodeStats)
 	r.Get("/api/code/messages", h.GetCodeMessages)
 
-	// OAuth-based endpoints (legacy)
+	// Legacy endpoints (kept for backward compatibility)
 	r.Post("/api/logout", h.Logout)
 	r.Get("/api/me", h.Me)
 	r.Get("/api/stats", h.GetStats)

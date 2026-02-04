@@ -10,15 +10,14 @@ import (
 )
 
 type CleanupJob struct {
-	adminSessionRepo      repository.AdminSessionRepository
-	portalSessionRepo     repository.PortalSessionRepository
-	portalAccessCodeRepo  repository.PortalAccessCodeRepository
-	pairingCodeRepo       repository.PairingCodeRepository
-	inboundMsgRepo        repository.InboundMessageRepository
-	oauthStateRepo        repository.OAuthStateRepository
-	sessionRepo           repository.SessionRepository
-	interval              time.Duration
-	done                  chan struct{}
+	adminSessionRepo     repository.AdminSessionRepository
+	portalSessionRepo    repository.PortalSessionRepository
+	portalAccessCodeRepo repository.PortalAccessCodeRepository
+	pairingCodeRepo      repository.PairingCodeRepository
+	inboundMsgRepo       repository.InboundMessageRepository
+	sessionRepo          repository.SessionRepository
+	interval             time.Duration
+	done                 chan struct{}
 }
 
 func NewCleanupJob(
@@ -27,7 +26,6 @@ func NewCleanupJob(
 	portalAccessCodeRepo repository.PortalAccessCodeRepository,
 	pairingCodeRepo repository.PairingCodeRepository,
 	inboundMsgRepo repository.InboundMessageRepository,
-	oauthStateRepo repository.OAuthStateRepository,
 	sessionRepo repository.SessionRepository,
 	interval time.Duration,
 ) *CleanupJob {
@@ -37,7 +35,6 @@ func NewCleanupJob(
 		portalAccessCodeRepo: portalAccessCodeRepo,
 		pairingCodeRepo:      pairingCodeRepo,
 		inboundMsgRepo:       inboundMsgRepo,
-		oauthStateRepo:       oauthStateRepo,
 		sessionRepo:          sessionRepo,
 		interval:             interval,
 		done:                 make(chan struct{}),
@@ -79,9 +76,6 @@ func (j *CleanupJob) cleanup() {
 	j.runCleanup(ctx, "portal access codes", j.portalAccessCodeRepo.DeleteExpired)
 	j.runCleanup(ctx, "pairing codes", j.pairingCodeRepo.DeleteExpired)
 	j.runCleanup(ctx, "inbound messages", j.inboundMsgRepo.MarkExpired)
-	if j.oauthStateRepo != nil {
-		j.runCleanup(ctx, "oauth states", j.oauthStateRepo.DeleteExpired)
-	}
 	if j.sessionRepo != nil {
 		j.runCleanup(ctx, "sessions", j.sessionRepo.DeleteExpired)
 	}

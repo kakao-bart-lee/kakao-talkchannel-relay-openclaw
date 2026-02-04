@@ -65,8 +65,6 @@ func main() {
 	adminSessionRepo := repository.NewAdminSessionRepository(db.DB)
 	inboundMsgRepo := repository.NewInboundMessageRepository(db.DB)
 	outboundMsgRepo := repository.NewOutboundMessageRepository(db.DB)
-	oauthAccountRepo := repository.NewOAuthAccountRepository(db.DB)
-	oauthStateRepo := repository.NewOAuthStateRepository(db.DB)
 	sessionRepo := repository.NewSessionRepository(db.DB)
 
 	broker := sse.NewBroker(redisClient)
@@ -85,10 +83,6 @@ func main() {
 	portalService := service.NewPortalService(
 		portalUserRepo, portalSessionRepo, accountRepo,
 		cfg.PortalSessionSecret,
-	)
-	oauthService := service.NewOAuthService(
-		cfg, portalUserRepo, oauthAccountRepo, oauthStateRepo,
-		portalSessionRepo, accountRepo, portalService,
 	)
 	sessionService := service.NewSessionService(db, sessionRepo, accountRepo, broker)
 
@@ -113,7 +107,6 @@ func main() {
 	portalHandler := handler.NewPortalHandler(
 		portalService, pairingService, portalAccessService, convService, messageService, adminService, isProduction,
 	)
-	oauthHandler := handler.NewOAuthHandler(oauthService, portalService, isProduction)
 	sessionHandler := handler.NewSessionHandler(sessionService)
 
 	r := chi.NewRouter()
@@ -170,13 +163,12 @@ func main() {
 		r.Use(securityHeadersMiddleware.Handler)
 		r.Use(csrfMiddleware.Handler)
 		r.Mount("/", portalHandler.Routes())
-		r.Mount("/api/oauth", oauthHandler.Routes())
 		r.NotFound(handler.StaticFileServer("static/portal", "/portal").ServeHTTP)
 	})
 
 	cleanupJob := jobs.NewCleanupJob(
 		adminSessionRepo, portalSessionRepo, portalAccessCodeRepo, pairingCodeRepo, inboundMsgRepo,
-		oauthStateRepo, sessionRepo, config.CleanupJobInterval,
+		sessionRepo, config.CleanupJobInterval,
 	)
 	cleanupJob.Start()
 	defer cleanupJob.Stop()
