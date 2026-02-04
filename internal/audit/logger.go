@@ -27,6 +27,8 @@ const (
 	EventAuthFailure     EventType = "auth_failure"
 	EventSessionCreate   EventType = "session_create"
 	EventSessionDelete   EventType = "session_delete"
+	EventCodeGenerate    EventType = "code_generate"
+	EventCodeLogin       EventType = "code_login"
 )
 
 type Event struct {

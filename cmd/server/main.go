@@ -175,7 +175,7 @@ func main() {
 	})
 
 	cleanupJob := jobs.NewCleanupJob(
-		adminSessionRepo, portalSessionRepo, pairingCodeRepo, inboundMsgRepo,
+		adminSessionRepo, portalSessionRepo, portalAccessCodeRepo, pairingCodeRepo, inboundMsgRepo,
 		oauthStateRepo, sessionRepo, config.CleanupJobInterval,
 	)
 	cleanupJob.Start()

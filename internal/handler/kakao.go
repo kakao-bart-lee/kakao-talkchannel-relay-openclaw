@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/openclaw/relay-server-go/internal/audit"
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/service"
 	"github.com/openclaw/relay-server-go/internal/sse"
@@ -268,6 +269,20 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 			log.Error().Err(err).Msg("failed to generate portal access code")
 			return NewTextResponse("코드 생성에 실패했습니다. 잠시 후 다시 시도해주세요.")
 		}
+
+		// Audit log
+		auditEvent := audit.Event{
+			Type: audit.EventCodeGenerate,
+			Details: map[string]interface{}{
+				"conversationKey": conversationKey,
+				"code":            code.Code,
+				"expiresAt":       code.ExpiresAt,
+			},
+		}
+		if conv.AccountID != nil {
+			auditEvent.AccountID = *conv.AccountID
+		}
+		audit.LogFromRequest(r, auditEvent)
 
 		expiresIn := int(time.Until(code.ExpiresAt).Minutes())
 		return NewTextResponse(fmt.Sprintf(

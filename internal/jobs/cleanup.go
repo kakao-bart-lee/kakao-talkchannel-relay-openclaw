@@ -10,19 +10,21 @@ import (
 )
 
 type CleanupJob struct {
-	adminSessionRepo  repository.AdminSessionRepository
-	portalSessionRepo repository.PortalSessionRepository
-	pairingCodeRepo   repository.PairingCodeRepository
-	inboundMsgRepo    repository.InboundMessageRepository
-	oauthStateRepo    repository.OAuthStateRepository
-	sessionRepo       repository.SessionRepository
-	interval          time.Duration
-	done              chan struct{}
+	adminSessionRepo      repository.AdminSessionRepository
+	portalSessionRepo     repository.PortalSessionRepository
+	portalAccessCodeRepo  repository.PortalAccessCodeRepository
+	pairingCodeRepo       repository.PairingCodeRepository
+	inboundMsgRepo        repository.InboundMessageRepository
+	oauthStateRepo        repository.OAuthStateRepository
+	sessionRepo           repository.SessionRepository
+	interval              time.Duration
+	done                  chan struct{}
 }
 
 func NewCleanupJob(
 	adminSessionRepo repository.AdminSessionRepository,
 	portalSessionRepo repository.PortalSessionRepository,
+	portalAccessCodeRepo repository.PortalAccessCodeRepository,
 	pairingCodeRepo repository.PairingCodeRepository,
 	inboundMsgRepo repository.InboundMessageRepository,
 	oauthStateRepo repository.OAuthStateRepository,
@@ -30,14 +32,15 @@ func NewCleanupJob(
 	interval time.Duration,
 ) *CleanupJob {
 	return &CleanupJob{
-		adminSessionRepo:  adminSessionRepo,
-		portalSessionRepo: portalSessionRepo,
-		pairingCodeRepo:   pairingCodeRepo,
-		inboundMsgRepo:    inboundMsgRepo,
-		oauthStateRepo:    oauthStateRepo,
-		sessionRepo:       sessionRepo,
-		interval:          interval,
-		done:              make(chan struct{}),
+		adminSessionRepo:     adminSessionRepo,
+		portalSessionRepo:    portalSessionRepo,
+		portalAccessCodeRepo: portalAccessCodeRepo,
+		pairingCodeRepo:      pairingCodeRepo,
+		inboundMsgRepo:       inboundMsgRepo,
+		oauthStateRepo:       oauthStateRepo,
+		sessionRepo:          sessionRepo,
+		interval:             interval,
+		done:                 make(chan struct{}),
 	}
 }
 
@@ -73,6 +76,7 @@ func (j *CleanupJob) cleanup() {
 
 	j.runCleanup(ctx, "admin sessions", j.adminSessionRepo.DeleteExpired)
 	j.runCleanup(ctx, "portal sessions", j.portalSessionRepo.DeleteExpired)
+	j.runCleanup(ctx, "portal access codes", j.portalAccessCodeRepo.DeleteExpired)
 	j.runCleanup(ctx, "pairing codes", j.pairingCodeRepo.DeleteExpired)
 	j.runCleanup(ctx, "inbound messages", j.inboundMsgRepo.MarkExpired)
 	if j.oauthStateRepo != nil {
