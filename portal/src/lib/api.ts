@@ -89,6 +89,39 @@ export interface UserStats {
   lastActivity: string | null;
 }
 
+export interface ConversationStats {
+  conversationKey: string;
+  messages: {
+    inbound: {
+      today: number;
+      total: number;
+    };
+    outbound: {
+      today: number;
+      total: number;
+      failed: number;
+    };
+  };
+}
+
+export interface PublicStats {
+  system: {
+    accounts: number;
+    connections: number;
+    sessions: {
+      pending: number;
+      paired: number;
+      total: number;
+    };
+  };
+  messages: {
+    inbound: {
+      queued: number;
+    };
+  };
+  isPublic: boolean;
+}
+
 interface RequestOptions extends RequestInit {
   silent401?: boolean;
 }
@@ -160,6 +193,8 @@ export const api = {
 
   getStats: () => request<UserStats>('/portal/api/stats'),
 
+  getPublicStats: () => request<PublicStats>('/portal/api/stats/public'),
+
   generatePairingCode: (expirySeconds?: number) =>
     request<PairingCode>('/portal/api/pairing/generate', {
       method: 'POST',
@@ -204,6 +239,24 @@ export const api = {
     return request<MessagesResponse>(`/portal/api/messages${query ? `?${query}` : ''}`);
   },
 
+  // Code-based auth endpoints
+  loginWithCode: (code: string) =>
+    request<{ success: boolean; conversationKey: string }>('/portal/api/auth/code', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+
+  getCodeStats: () => request<ConversationStats>('/portal/api/code/stats'),
+
+  getCodeMessages: (params?: { type?: string; limit?: number; offset?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.type) searchParams.set('type', params.type);
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.offset) searchParams.set('offset', String(params.offset));
+    const query = searchParams.toString();
+    return request<MessagesResponse>(`/portal/api/code/messages${query ? `?${query}` : ''}`);
+  },
+
   // OAuth endpoints
   getLinkedProviders: () => request<OAuthProvidersResponse>('/portal/api/oauth/providers'),
 
@@ -212,3 +265,8 @@ export const api = {
       method: 'DELETE',
     }),
 };
+
+// Export individual functions for easier importing
+export const loginWithCode = api.loginWithCode;
+export const getCodeStats = api.getCodeStats;
+export const getCodeMessages = api.getCodeMessages;

@@ -59,6 +59,7 @@ func main() {
 	accountRepo := repository.NewAccountRepository(db.DB)
 	convRepo := repository.NewConversationRepository(db.DB)
 	pairingCodeRepo := repository.NewPairingCodeRepository(db.DB)
+	portalAccessCodeRepo := repository.NewPortalAccessCodeRepository(db.DB)
 	portalUserRepo := repository.NewPortalUserRepository(db.DB)
 	portalSessionRepo := repository.NewPortalSessionRepository(db.DB)
 	adminSessionRepo := repository.NewAdminSessionRepository(db.DB)
@@ -73,6 +74,7 @@ func main() {
 
 	convService := service.NewConversationService(convRepo)
 	pairingService := service.NewPairingService(pairingCodeRepo, convRepo)
+	portalAccessService := service.NewPortalAccessService(portalAccessCodeRepo, convRepo)
 	messageService := service.NewMessageService(inboundMsgRepo, outboundMsgRepo)
 	kakaoService := service.NewKakaoService()
 	adminService := service.NewAdminService(
@@ -103,13 +105,13 @@ func main() {
 	securityHeadersMiddleware := middleware.NewSecurityHeadersMiddleware(isProduction)
 
 	kakaoHandler := handler.NewKakaoHandler(
-		convService, sessionService, messageService, broker, cfg.CallbackTTL(),
+		convService, sessionService, messageService, portalAccessService, broker, cfg.CallbackTTL(),
 	)
 	eventsHandler := handler.NewEventsHandler(broker, messageService)
 	openclawHandler := handler.NewOpenClawHandler(messageService, kakaoService)
 	adminHandler := handler.NewAdminHandler(adminService, adminSessionMiddleware.Handler, isProduction)
 	portalHandler := handler.NewPortalHandler(
-		portalService, pairingService, convService, messageService, isProduction,
+		portalService, pairingService, portalAccessService, convService, messageService, adminService, isProduction,
 	)
 	oauthHandler := handler.NewOAuthHandler(oauthService, portalService, isProduction)
 	sessionHandler := handler.NewSessionHandler(sessionService)

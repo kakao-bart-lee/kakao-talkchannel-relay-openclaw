@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -14,7 +15,7 @@ import (
 )
 
 type Command struct {
-	Type string // PAIR, UNPAIR, STATUS, HELP
+	Type string // PAIR, UNPAIR, STATUS, HELP, CODE
 	Code string
 }
 
@@ -40,30 +41,37 @@ func parseCommand(utterance string) *Command {
 		return &Command{Type: "HELP"}
 	}
 
+	if trimmed == "/code" {
+		return &Command{Type: "CODE"}
+	}
+
 	return nil
 }
 
 type KakaoHandler struct {
-	convService    *service.ConversationService
-	sessionService *service.SessionService
-	messageService *service.MessageService
-	broker         *sse.Broker
-	callbackTTL    time.Duration
+	convService         *service.ConversationService
+	sessionService      *service.SessionService
+	messageService      *service.MessageService
+	portalAccessService *service.PortalAccessService
+	broker              *sse.Broker
+	callbackTTL         time.Duration
 }
 
 func NewKakaoHandler(
 	convService *service.ConversationService,
 	sessionService *service.SessionService,
 	messageService *service.MessageService,
+	portalAccessService *service.PortalAccessService,
 	broker *sse.Broker,
 	callbackTTL time.Duration,
 ) *KakaoHandler {
 	return &KakaoHandler{
-		convService:    convService,
-		sessionService: sessionService,
-		messageService: messageService,
-		broker:         broker,
-		callbackTTL:    callbackTTL,
+		convService:         convService,
+		sessionService:      sessionService,
+		messageService:      messageService,
+		portalAccessService: portalAccessService,
+		broker:              broker,
+		callbackTTL:         callbackTTL,
 	}
 }
 
@@ -221,9 +229,56 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 			if conv.PairedAt != nil {
 				pairedAt = conv.PairedAt.Format("2006-01-02 15:04:05")
 			}
-			return NewTextResponse("✅ 연결됨\n\n연결 시간: " + pairedAt)
+
+			stats, err := h.messageService.GetQuickStats(ctx, *conv.AccountID)
+			if err != nil {
+				log.Error().Err(err).Msg("failed to get quick stats for status command")
+				return NewTextResponse("✅ 연결됨\n\n연결 시간: " + pairedAt)
+			}
+
+			return NewTextResponse(fmt.Sprintf(
+				"✅ 연결됨\n\n"+
+					"📊 오늘 통계\n"+
+					"• 수신: %d건\n"+
+					"• 발신: %d건 (실패 %d)\n\n"+
+					"📈 전체 통계\n"+
+					"• 총 수신: %d건\n"+
+					"• 총 발신: %d건\n\n"+
+					"연결 시간: %s",
+				stats.InboundToday,
+				stats.OutboundToday,
+				stats.OutboundFailed,
+				stats.InboundTotal,
+				stats.OutboundTotal,
+				pairedAt,
+			))
 		}
 		return NewTextResponse("❌ 연결되지 않음\n\n/pair <코드>로 연결하세요.")
+
+	case "CODE":
+		if conv.State != model.PairingStatePaired {
+			return NewTextResponse(
+				"포털 접속 코드는 연결된 대화에서만 발급할 수 있습니다.\n\n" +
+					"먼저 /pair <코드>로 연결하세요.",
+			)
+		}
+
+		code, err := h.portalAccessService.GenerateCode(ctx, conversationKey)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to generate portal access code")
+			return NewTextResponse("코드 생성에 실패했습니다. 잠시 후 다시 시도해주세요.")
+		}
+
+		expiresIn := int(time.Until(code.ExpiresAt).Minutes())
+		return NewTextResponse(fmt.Sprintf(
+			"🔑 포털 접속 코드\n\n"+
+				"코드: %s\n"+
+				"유효시간: %d분\n\n"+
+				"이 코드로 포털에서 대화 내역과 통계를 확인할 수 있습니다.\n\n"+
+				"포털 주소:\nhttps://relay.openclaw.ai/portal/code",
+			code.Code,
+			expiresIn,
+		))
 
 	case "HELP":
 		return NewTextResponse(
@@ -233,6 +288,7 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 				"• /pair <코드> - OpenClaw에 연결\n" +
 				"• /unpair - 연결 해제\n" +
 				"• /status - 연결 상태 확인\n" +
+				"• /code - 포털 접속 코드 발급\n" +
 				"• /help - 이 도움말",
 		)
 
