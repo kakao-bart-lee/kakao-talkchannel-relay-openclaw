@@ -478,6 +478,23 @@ func (h *PortalHandler) LoginWithCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Rate limit check: 5 times per 1 minute per IP
+	clientIP := getClientIP(r)
+	allowed, resetAt := h.portalAccessService.CheckLoginLimit(r.Context(), clientIP)
+	if !allowed {
+		secondsLeft := int(time.Until(resetAt).Seconds()) + 1
+		log.Warn().
+			Str("ip", clientIP).
+			Str("code", req.Code).
+			Msg("code login rate limit exceeded")
+
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", secondsLeft))
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{
+			"error": "Too many login attempts. Please try again later.",
+		})
+		return
+	}
+
 	conversationKey, err := h.portalAccessService.VerifyCode(r.Context(), req.Code)
 	if err != nil {
 		log.Warn().Err(err).Str("code", req.Code).Msg("invalid portal code")
@@ -492,8 +509,12 @@ func (h *PortalHandler) LoginWithCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store session (in-memory for now)
-	h.portalAccessService.StoreSession(session)
+	// Store session in Redis
+	if err := h.portalAccessService.StoreSession(r.Context(), session); err != nil {
+		log.Error().Err(err).Msg("failed to store session")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create session"})
+		return
+	}
 
 	// Set cookie
 	http.SetCookie(w, &http.Cookie{
@@ -585,10 +606,20 @@ func (h *PortalHandler) getCodeSessionConversationKey(r *http.Request) string {
 		return ""
 	}
 
-	conversationKey, err := h.portalAccessService.ValidateCodeSession(cookie.Value)
+	conversationKey, err := h.portalAccessService.ValidateCodeSession(r.Context(), cookie.Value)
 	if err != nil {
 		return ""
 	}
 
 	return conversationKey
+}
+
+func getClientIP(r *http.Request) string {
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		return forwarded
+	}
+	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		return realIP
+	}
+	return r.RemoteAddr
 }

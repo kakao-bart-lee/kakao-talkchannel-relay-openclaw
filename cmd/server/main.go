@@ -72,7 +72,7 @@ func main() {
 
 	convService := service.NewConversationService(convRepo)
 	pairingService := service.NewPairingService(pairingCodeRepo, convRepo)
-	portalAccessService := service.NewPortalAccessService(portalAccessCodeRepo, convRepo)
+	portalAccessService := service.NewPortalAccessService(portalAccessCodeRepo, convRepo, redisClient)
 	messageService := service.NewMessageService(inboundMsgRepo, outboundMsgRepo)
 	kakaoService := service.NewKakaoService()
 	adminService := service.NewAdminService(

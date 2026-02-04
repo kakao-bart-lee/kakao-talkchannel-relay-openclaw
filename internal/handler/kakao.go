@@ -264,6 +264,18 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 			)
 		}
 
+		// Rate limit check: 3 times per 5 minutes
+		allowed, resetAt := h.portalAccessService.CheckCodeGenerationLimit(ctx, conversationKey)
+		if !allowed {
+			minutesLeft := int(time.Until(resetAt).Minutes()) + 1
+			return NewTextResponse(fmt.Sprintf(
+				"⏱️ 코드 생성 한도 초과\n\n"+
+					"5분에 최대 3회까지 코드를 생성할 수 있습니다.\n\n"+
+					"%d분 후 다시 시도해주세요.",
+				minutesLeft,
+			))
+		}
+
 		code, err := h.portalAccessService.GenerateCode(ctx, conversationKey)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to generate portal access code")

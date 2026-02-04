@@ -5,15 +5,18 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/repository"
+	redisclient "github.com/openclaw/relay-server-go/internal/redis"
 )
 
 const (
@@ -31,18 +34,23 @@ type PortalCodeSession struct {
 
 // PortalAccessService handles portal access code operations
 type PortalAccessService struct {
-	codeRepo repository.PortalAccessCodeRepository
-	convRepo repository.ConversationRepository
+	codeRepo    repository.PortalAccessCodeRepository
+	convRepo    repository.ConversationRepository
+	redisClient *redisclient.Client
+	rateLimiter *RateLimiter
 }
 
 // NewPortalAccessService creates a new portal access service
 func NewPortalAccessService(
 	codeRepo repository.PortalAccessCodeRepository,
 	convRepo repository.ConversationRepository,
+	redisClient *redisclient.Client,
 ) *PortalAccessService {
 	return &PortalAccessService{
-		codeRepo: codeRepo,
-		convRepo: convRepo,
+		codeRepo:    codeRepo,
+		convRepo:    convRepo,
+		redisClient: redisClient,
+		rateLimiter: NewRateLimiter(redisClient.Client),
 	}
 }
 
@@ -146,29 +154,72 @@ func (s *PortalAccessService) CreateCodeSession(
 	return session, nil
 }
 
-// ValidateCodeSession validates a portal session token
-// In-memory implementation for now. For production, use Redis.
-var sessionStore = make(map[string]*PortalCodeSession)
-
+// ValidateCodeSession validates a portal session token using Redis
 func (s *PortalAccessService) ValidateCodeSession(
+	ctx context.Context,
 	token string,
 ) (string, error) {
-	session, ok := sessionStore[token]
-	if !ok {
-		return "", fmt.Errorf("invalid session")
+	key := fmt.Sprintf("portal_session:%s", token)
+	data, err := s.redisClient.Get(ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return "", fmt.Errorf("session expired or invalid")
+		}
+		return "", fmt.Errorf("validate session: %w", err)
 	}
 
-	if time.Now().After(session.ExpiresAt) {
-		delete(sessionStore, token)
-		return "", fmt.Errorf("session expired")
+	var session PortalCodeSession
+	if err := json.Unmarshal([]byte(data), &session); err != nil {
+		return "", fmt.Errorf("unmarshal session: %w", err)
 	}
 
 	return session.ConversationKey, nil
 }
 
-// StoreSession stores a session in memory (temporary implementation)
-func (s *PortalAccessService) StoreSession(session *PortalCodeSession) {
-	sessionStore[session.Token] = session
+// StoreSession stores a session in Redis with automatic expiry
+func (s *PortalAccessService) StoreSession(ctx context.Context, session *PortalCodeSession) error {
+	key := fmt.Sprintf("portal_session:%s", session.Token)
+	data, err := json.Marshal(session)
+	if err != nil {
+		return fmt.Errorf("marshal session: %w", err)
+	}
+
+	ttl := time.Until(session.ExpiresAt)
+	if ttl <= 0 {
+		return fmt.Errorf("session already expired")
+	}
+
+	if err := s.redisClient.Set(ctx, key, data, ttl).Err(); err != nil {
+		return fmt.Errorf("store session: %w", err)
+	}
+
+	log.Debug().
+		Str("token", session.Token[:16]+"...").
+		Str("conversationKey", session.ConversationKey).
+		Dur("ttl", ttl).
+		Msg("session stored in redis")
+
+	return nil
+}
+
+// CheckCodeGenerationLimit checks if code generation is allowed for a conversation
+// Limit: 3 times per 5 minutes per conversationKey
+func (s *PortalAccessService) CheckCodeGenerationLimit(
+	ctx context.Context,
+	conversationKey string,
+) (allowed bool, resetAt time.Time) {
+	key := fmt.Sprintf("code_gen:%s", conversationKey)
+	return s.rateLimiter.CheckLimit(ctx, key, 3, 5*time.Minute)
+}
+
+// CheckLoginLimit checks if login attempts are allowed for an IP
+// Limit: 5 times per 1 minute per IP
+func (s *PortalAccessService) CheckLoginLimit(
+	ctx context.Context,
+	ip string,
+) (allowed bool, resetAt time.Time) {
+	key := fmt.Sprintf("code_login:%s", ip)
+	return s.rateLimiter.CheckLimit(ctx, key, 5, 1*time.Minute)
 }
 
 // generatePortalCode generates an 8-character code in XXXX-XXXX format
