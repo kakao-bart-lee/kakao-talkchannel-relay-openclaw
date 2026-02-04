@@ -83,7 +83,22 @@ func (m *mockInboundRepo) CountByAccountIDSince(ctx context.Context, accountID s
 	return args.Int(0), args.Error(1)
 }
 
-type mockOutboundRepo struct {
+func (m *mockInboundRepo) FindByConversationKey(ctx context.Context, conversationKey string, limit, offset int) ([]model.InboundMessage, error) {
+	args := m.Called(ctx, conversationKey, limit, offset)
+	return args.Get(0).([]model.InboundMessage), args.Error(1)
+}
+
+func (m *mockInboundRepo) CountByConversationKey(ctx context.Context, conversationKey string) (int, error) {
+	args := m.Called(ctx, conversationKey)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *mockInboundRepo) CountByConversationKeySince(ctx context.Context, conversationKey string, since time.Time) (int, error) {
+	args := m.Called(ctx, conversationKey, since)
+	return args.Int(0), args.Error(1)
+}
+
+type mockOutboundRepo struct{
 	mock.Mock
 }
 
@@ -144,6 +159,29 @@ func (m *mockOutboundRepo) FindRecentFailedByAccountID(ctx context.Context, acco
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]model.OutboundMessage), args.Error(1)
+}
+
+func (m *mockOutboundRepo) FindByConversationKey(ctx context.Context, conversationKey string, limit, offset int) ([]model.OutboundMessage, error) {
+	args := m.Called(ctx, conversationKey, limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.OutboundMessage), args.Error(1)
+}
+
+func (m *mockOutboundRepo) CountByConversationKey(ctx context.Context, conversationKey string) (int, error) {
+	args := m.Called(ctx, conversationKey)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *mockOutboundRepo) CountByConversationKeySince(ctx context.Context, conversationKey string, since time.Time) (int, error) {
+	args := m.Called(ctx, conversationKey, since)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *mockOutboundRepo) CountByConversationKeyAndStatus(ctx context.Context, conversationKey string, status model.OutboundMessageStatus) (int, error) {
+	args := m.Called(ctx, conversationKey, status)
+	return args.Int(0), args.Error(1)
 }
 
 type mockKakaoService struct {
