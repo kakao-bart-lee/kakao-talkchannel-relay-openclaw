@@ -262,6 +262,55 @@ type ConnectionStat struct {
 	LastSeenAt *time.Time
 }
 
+// QuickStats represents basic message statistics for display in chat
+type QuickStats struct {
+	InboundToday   int
+	InboundTotal   int
+	OutboundToday  int
+	OutboundTotal  int
+	OutboundFailed int
+}
+
+// GetQuickStats returns simple message counts for an account (used by /status command)
+func (s *MessageService) GetQuickStats(ctx context.Context, accountID string) (*QuickStats, error) {
+	stats := &QuickStats{}
+
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	inboundTotal, err := s.inboundRepo.CountByAccountID(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("count inbound messages: %w", err)
+	}
+	stats.InboundTotal = inboundTotal
+
+	inboundToday, err := s.inboundRepo.CountByAccountIDSince(ctx, accountID, todayStart)
+	if err != nil {
+		return nil, fmt.Errorf("count inbound today: %w", err)
+	}
+	stats.InboundToday = inboundToday
+
+	outboundTotal, err := s.outboundRepo.CountByAccountID(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("count outbound messages: %w", err)
+	}
+	stats.OutboundTotal = outboundTotal
+
+	outboundToday, err := s.outboundRepo.CountByAccountIDSince(ctx, accountID, todayStart)
+	if err != nil {
+		return nil, fmt.Errorf("count outbound today: %w", err)
+	}
+	stats.OutboundToday = outboundToday
+
+	failedCount, err := s.outboundRepo.CountByAccountIDAndStatus(ctx, accountID, model.OutboundStatusFailed)
+	if err != nil {
+		return nil, fmt.Errorf("count failed messages: %w", err)
+	}
+	stats.OutboundFailed = failedCount
+
+	return stats, nil
+}
+
 func (s *MessageService) GetMessageHistory(ctx context.Context, params MessageHistoryParams) (*MessageHistoryResult, error) {
 	var messages []MessageHistoryItem
 	var total int
@@ -329,6 +378,183 @@ func (s *MessageService) GetMessageHistory(ctx context.Context, params MessageHi
 			return nil, fmt.Errorf("count inbound messages: %w", err)
 		}
 		outboundCount, err := s.outboundRepo.CountByAccountID(ctx, params.AccountID)
+		if err != nil {
+			return nil, fmt.Errorf("count outbound messages: %w", err)
+		}
+		total = inboundCount + outboundCount
+
+		for _, msg := range inboundMsgs {
+			messages = append(messages, MessageHistoryItem{
+				ID:              msg.ID,
+				ConversationKey: msg.ConversationKey,
+				Direction:       "inbound",
+				Content:         msg.NormalizedMessage,
+				CreatedAt:       msg.CreatedAt,
+			})
+		}
+		for _, msg := range outboundMsgs {
+			payload := msg.ResponsePayload
+			messages = append(messages, MessageHistoryItem{
+				ID:              msg.ID,
+				ConversationKey: msg.ConversationKey,
+				Direction:       "outbound",
+				Content:         &payload,
+				CreatedAt:       msg.CreatedAt,
+			})
+		}
+
+		// Sort by created_at descending
+		sort.Slice(messages, func(i, j int) bool {
+			return messages[i].CreatedAt.After(messages[j].CreatedAt)
+		})
+
+		// Limit results
+		if len(messages) > params.Limit {
+			messages = messages[:params.Limit]
+		}
+	}
+
+	return &MessageHistoryResult{
+		Messages: messages,
+		Total:    total,
+		HasMore:  params.Offset+len(messages) < total,
+	}, nil
+}
+
+// ConversationStats represents statistics for a specific conversation
+type ConversationStats struct {
+	ConversationKey string `json:"conversationKey"`
+	Messages        struct {
+		Inbound struct {
+			Today int `json:"today"`
+			Total int `json:"total"`
+		} `json:"inbound"`
+		Outbound struct {
+			Today  int `json:"today"`
+			Total  int `json:"total"`
+			Failed int `json:"failed"`
+		} `json:"outbound"`
+	} `json:"messages"`
+}
+
+// GetConversationStats returns statistics for a specific conversation
+func (s *MessageService) GetConversationStats(ctx context.Context, conversationKey string) (*ConversationStats, error) {
+	stats := &ConversationStats{
+		ConversationKey: conversationKey,
+	}
+
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	inboundTotal, err := s.inboundRepo.CountByConversationKey(ctx, conversationKey)
+	if err != nil {
+		return nil, fmt.Errorf("count inbound messages: %w", err)
+	}
+	stats.Messages.Inbound.Total = inboundTotal
+
+	inboundToday, err := s.inboundRepo.CountByConversationKeySince(ctx, conversationKey, todayStart)
+	if err != nil {
+		return nil, fmt.Errorf("count inbound messages today: %w", err)
+	}
+	stats.Messages.Inbound.Today = inboundToday
+
+	outboundTotal, err := s.outboundRepo.CountByConversationKey(ctx, conversationKey)
+	if err != nil {
+		return nil, fmt.Errorf("count outbound messages: %w", err)
+	}
+	stats.Messages.Outbound.Total = outboundTotal
+
+	outboundToday, err := s.outboundRepo.CountByConversationKeySince(ctx, conversationKey, todayStart)
+	if err != nil {
+		return nil, fmt.Errorf("count outbound messages today: %w", err)
+	}
+	stats.Messages.Outbound.Today = outboundToday
+
+	failedCount, err := s.outboundRepo.CountByConversationKeyAndStatus(ctx, conversationKey, model.OutboundStatusFailed)
+	if err != nil {
+		return nil, fmt.Errorf("count failed messages: %w", err)
+	}
+	stats.Messages.Outbound.Failed = failedCount
+
+	return stats, nil
+}
+
+// ConversationMessagesParams contains parameters for fetching conversation messages
+type ConversationMessagesParams struct {
+	ConversationKey string
+	Type            string // "inbound", "outbound", or "" for all
+	Limit           int
+	Offset          int
+}
+
+// GetConversationMessages returns message history for a specific conversation
+func (s *MessageService) GetConversationMessages(ctx context.Context, params ConversationMessagesParams) (*MessageHistoryResult, error) {
+	var messages []MessageHistoryItem
+	var total int
+
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+	if params.Limit > 100 {
+		params.Limit = 100
+	}
+
+	switch params.Type {
+	case "inbound":
+		inboundMsgs, err := s.inboundRepo.FindByConversationKey(ctx, params.ConversationKey, params.Limit, params.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("find inbound messages: %w", err)
+		}
+		total, err = s.inboundRepo.CountByConversationKey(ctx, params.ConversationKey)
+		if err != nil {
+			return nil, fmt.Errorf("count inbound messages: %w", err)
+		}
+		for _, msg := range inboundMsgs {
+			messages = append(messages, MessageHistoryItem{
+				ID:              msg.ID,
+				ConversationKey: msg.ConversationKey,
+				Direction:       "inbound",
+				Content:         msg.NormalizedMessage,
+				CreatedAt:       msg.CreatedAt,
+			})
+		}
+
+	case "outbound":
+		outboundMsgs, err := s.outboundRepo.FindByConversationKey(ctx, params.ConversationKey, params.Limit, params.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("find outbound messages: %w", err)
+		}
+		total, err = s.outboundRepo.CountByConversationKey(ctx, params.ConversationKey)
+		if err != nil {
+			return nil, fmt.Errorf("count outbound messages: %w", err)
+		}
+		for _, msg := range outboundMsgs {
+			payload := msg.ResponsePayload
+			messages = append(messages, MessageHistoryItem{
+				ID:              msg.ID,
+				ConversationKey: msg.ConversationKey,
+				Direction:       "outbound",
+				Content:         &payload,
+				CreatedAt:       msg.CreatedAt,
+			})
+		}
+
+	default:
+		// Fetch both and merge
+		inboundMsgs, err := s.inboundRepo.FindByConversationKey(ctx, params.ConversationKey, params.Limit, params.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("find inbound messages: %w", err)
+		}
+		outboundMsgs, err := s.outboundRepo.FindByConversationKey(ctx, params.ConversationKey, params.Limit, params.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("find outbound messages: %w", err)
+		}
+
+		inboundCount, err := s.inboundRepo.CountByConversationKey(ctx, params.ConversationKey)
+		if err != nil {
+			return nil, fmt.Errorf("count inbound messages: %w", err)
+		}
+		outboundCount, err := s.outboundRepo.CountByConversationKey(ctx, params.ConversationKey)
 		if err != nil {
 			return nil, fmt.Errorf("count outbound messages: %w", err)
 		}

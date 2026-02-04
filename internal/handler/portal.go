@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -15,32 +16,46 @@ import (
 )
 
 type PortalHandler struct {
-	portalService  *service.PortalService
-	pairingService *service.PairingService
-	convService    *service.ConversationService
-	msgService     *service.MessageService
-	isProduction   bool
+	portalService       *service.PortalService
+	pairingService      *service.PairingService
+	portalAccessService *service.PortalAccessService
+	convService         *service.ConversationService
+	msgService          *service.MessageService
+	adminService        *service.AdminService
+	isProduction        bool
 }
 
 func NewPortalHandler(
 	portalService *service.PortalService,
 	pairingService *service.PairingService,
+	portalAccessService *service.PortalAccessService,
 	convService *service.ConversationService,
 	msgService *service.MessageService,
+	adminService *service.AdminService,
 	isProduction bool,
 ) *PortalHandler {
 	return &PortalHandler{
-		portalService:  portalService,
-		pairingService: pairingService,
-		convService:    convService,
-		msgService:     msgService,
-		isProduction:   isProduction,
+		portalService:       portalService,
+		pairingService:      pairingService,
+		portalAccessService: portalAccessService,
+		convService:         convService,
+		msgService:          msgService,
+		adminService:        adminService,
+		isProduction:        isProduction,
 	}
 }
 
 func (h *PortalHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 
+	r.Get("/api/stats/public", h.GetPublicStats)
+
+	// Code-based auth endpoints
+	r.Post("/api/auth/code", h.LoginWithCode)
+	r.Get("/api/code/stats", h.GetCodeStats)
+	r.Get("/api/code/messages", h.GetCodeMessages)
+
+	// Legacy endpoints (kept for backward compatibility)
 	r.Post("/api/logout", h.Logout)
 	r.Get("/api/me", h.Me)
 	r.Get("/api/stats", h.GetStats)
@@ -95,6 +110,35 @@ func (h *PortalHandler) Me(w http.ResponseWriter, r *http.Request) {
 			"createdAt": user.CreatedAt.Format(time.RFC3339),
 		},
 	})
+}
+
+func (h *PortalHandler) GetPublicStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.adminService.GetStats(r.Context())
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get public stats")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		return
+	}
+
+	publicStats := map[string]any{
+		"system": map[string]any{
+			"accounts":    stats.Accounts,
+			"connections": stats.Mappings,
+			"sessions": map[string]int{
+				"pending": stats.Sessions.Pending,
+				"paired":  stats.Sessions.Paired,
+				"total":   stats.Sessions.Total,
+			},
+		},
+		"messages": map[string]any{
+			"inbound": map[string]int{
+				"queued": stats.Messages.Inbound.Queued,
+			},
+		},
+		"isPublic": true,
+	}
+
+	writeJSON(w, http.StatusOK, publicStats)
 }
 
 func (h *PortalHandler) GetStats(w http.ResponseWriter, r *http.Request) {
@@ -415,4 +459,167 @@ func (h *PortalHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		"total":    result.Total,
 		"hasMore":  result.HasMore,
 	})
+}
+
+// Code-based authentication handlers
+
+func (h *PortalHandler) LoginWithCode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Code string `json:"code"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if req.Code == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Code is required"})
+		return
+	}
+
+	// Rate limit check: 5 times per 1 minute per IP
+	clientIP := getClientIP(r)
+	allowed, resetAt := h.portalAccessService.CheckLoginLimit(r.Context(), clientIP)
+	if !allowed {
+		secondsLeft := int(time.Until(resetAt).Seconds()) + 1
+		log.Warn().
+			Str("ip", clientIP).
+			Str("code", req.Code).
+			Msg("code login rate limit exceeded")
+
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", secondsLeft))
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{
+			"error": "Too many login attempts. Please try again later.",
+		})
+		return
+	}
+
+	conversationKey, err := h.portalAccessService.VerifyCode(r.Context(), req.Code)
+	if err != nil {
+		log.Warn().Err(err).Str("code", req.Code).Msg("invalid portal code")
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Invalid or expired code"})
+		return
+	}
+
+	session, err := h.portalAccessService.CreateCodeSession(conversationKey)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create code session")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create session"})
+		return
+	}
+
+	// Store session in Redis
+	if err := h.portalAccessService.StoreSession(r.Context(), session); err != nil {
+		log.Error().Err(err).Msg("failed to store session")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create session"})
+		return
+	}
+
+	// Set cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "portal_code_session",
+		Value:    session.Token,
+		Path:     "/portal",
+		MaxAge:   1800, // 30 minutes
+		HttpOnly: true,
+		Secure:   h.isProduction,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	audit.LogFromRequest(r, audit.Event{
+		Type: "code_login",
+		Details: map[string]interface{}{
+			"conversationKey": conversationKey,
+			"readOnly":        true,
+		},
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success":         true,
+		"conversationKey": conversationKey,
+	})
+}
+
+func (h *PortalHandler) GetCodeStats(w http.ResponseWriter, r *http.Request) {
+	conversationKey := h.getCodeSessionConversationKey(r)
+	if conversationKey == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
+		return
+	}
+
+	stats, err := h.msgService.GetConversationStats(r.Context(), conversationKey)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get conversation stats")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch stats"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}
+
+func (h *PortalHandler) GetCodeMessages(w http.ResponseWriter, r *http.Request) {
+	conversationKey := h.getCodeSessionConversationKey(r)
+	if conversationKey == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
+		return
+	}
+
+	msgType := r.URL.Query().Get("type")
+	limit := 20
+	offset := 0
+
+	if l := r.URL.Query().Get("limit"); l != "" {
+		fmt.Sscan(l, &limit)
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		fmt.Sscan(o, &offset)
+	}
+
+	result, err := h.msgService.GetConversationMessages(r.Context(), service.ConversationMessagesParams{
+		ConversationKey: conversationKey,
+		Type:            msgType,
+		Limit:           limit,
+		Offset:          offset,
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get conversation messages")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch messages"})
+		return
+	}
+
+	messages := result.Messages
+	if messages == nil {
+		messages = []service.MessageHistoryItem{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"messages": messages,
+		"total":    result.Total,
+		"hasMore":  result.HasMore,
+	})
+}
+
+func (h *PortalHandler) getCodeSessionConversationKey(r *http.Request) string {
+	cookie, err := r.Cookie("portal_code_session")
+	if err != nil {
+		return ""
+	}
+
+	conversationKey, err := h.portalAccessService.ValidateCodeSession(r.Context(), cookie.Value)
+	if err != nil {
+		return ""
+	}
+
+	return conversationKey
+}
+
+func getClientIP(r *http.Request) string {
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		return forwarded
+	}
+	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		return realIP
+	}
+	return r.RemoteAddr
 }

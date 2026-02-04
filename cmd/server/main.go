@@ -59,13 +59,12 @@ func main() {
 	accountRepo := repository.NewAccountRepository(db.DB)
 	convRepo := repository.NewConversationRepository(db.DB)
 	pairingCodeRepo := repository.NewPairingCodeRepository(db.DB)
+	portalAccessCodeRepo := repository.NewPortalAccessCodeRepository(db.DB)
 	portalUserRepo := repository.NewPortalUserRepository(db.DB)
 	portalSessionRepo := repository.NewPortalSessionRepository(db.DB)
 	adminSessionRepo := repository.NewAdminSessionRepository(db.DB)
 	inboundMsgRepo := repository.NewInboundMessageRepository(db.DB)
 	outboundMsgRepo := repository.NewOutboundMessageRepository(db.DB)
-	oauthAccountRepo := repository.NewOAuthAccountRepository(db.DB)
-	oauthStateRepo := repository.NewOAuthStateRepository(db.DB)
 	sessionRepo := repository.NewSessionRepository(db.DB)
 
 	broker := sse.NewBroker(redisClient)
@@ -73,6 +72,7 @@ func main() {
 
 	convService := service.NewConversationService(convRepo)
 	pairingService := service.NewPairingService(pairingCodeRepo, convRepo)
+	portalAccessService := service.NewPortalAccessService(portalAccessCodeRepo, convRepo, redisClient)
 	messageService := service.NewMessageService(inboundMsgRepo, outboundMsgRepo)
 	kakaoService := service.NewKakaoService()
 	adminService := service.NewAdminService(
@@ -83,10 +83,6 @@ func main() {
 	portalService := service.NewPortalService(
 		portalUserRepo, portalSessionRepo, accountRepo,
 		cfg.PortalSessionSecret,
-	)
-	oauthService := service.NewOAuthService(
-		cfg, portalUserRepo, oauthAccountRepo, oauthStateRepo,
-		portalSessionRepo, accountRepo, portalService,
 	)
 	sessionService := service.NewSessionService(db, sessionRepo, accountRepo, broker)
 
@@ -103,15 +99,14 @@ func main() {
 	securityHeadersMiddleware := middleware.NewSecurityHeadersMiddleware(isProduction)
 
 	kakaoHandler := handler.NewKakaoHandler(
-		convService, sessionService, messageService, broker, cfg.CallbackTTL(),
+		convService, sessionService, messageService, portalAccessService, broker, cfg.CallbackTTL(),
 	)
 	eventsHandler := handler.NewEventsHandler(broker, messageService)
 	openclawHandler := handler.NewOpenClawHandler(messageService, kakaoService)
 	adminHandler := handler.NewAdminHandler(adminService, adminSessionMiddleware.Handler, isProduction)
 	portalHandler := handler.NewPortalHandler(
-		portalService, pairingService, convService, messageService, isProduction,
+		portalService, pairingService, portalAccessService, convService, messageService, adminService, isProduction,
 	)
-	oauthHandler := handler.NewOAuthHandler(oauthService, portalService, isProduction)
 	sessionHandler := handler.NewSessionHandler(sessionService)
 
 	r := chi.NewRouter()
@@ -168,13 +163,12 @@ func main() {
 		r.Use(securityHeadersMiddleware.Handler)
 		r.Use(csrfMiddleware.Handler)
 		r.Mount("/", portalHandler.Routes())
-		r.Mount("/api/oauth", oauthHandler.Routes())
 		r.NotFound(handler.StaticFileServer("static/portal", "/portal").ServeHTTP)
 	})
 
 	cleanupJob := jobs.NewCleanupJob(
-		adminSessionRepo, portalSessionRepo, pairingCodeRepo, inboundMsgRepo,
-		oauthStateRepo, sessionRepo, config.CleanupJobInterval,
+		adminSessionRepo, portalSessionRepo, portalAccessCodeRepo, pairingCodeRepo, inboundMsgRepo,
+		sessionRepo, config.CleanupJobInterval,
 	)
 	cleanupJob.Start()
 	defer cleanupJob.Stop()

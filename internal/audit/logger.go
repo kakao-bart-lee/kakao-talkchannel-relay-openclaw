@@ -19,14 +19,13 @@ const (
 	EventAccountCreate   EventType = "account_create"
 	EventAccountDelete   EventType = "account_delete"
 	EventUserDelete      EventType = "user_delete"
-	EventOAuthLogin      EventType = "oauth_login"
-	EventOAuthLink       EventType = "oauth_link"
-	EventOAuthUnlink     EventType = "oauth_unlink"
 	EventRateLimitExceed EventType = "rate_limit_exceeded"
 	EventCSRFFailure     EventType = "csrf_failure"
 	EventAuthFailure     EventType = "auth_failure"
 	EventSessionCreate   EventType = "session_create"
 	EventSessionDelete   EventType = "session_delete"
+	EventCodeGenerate    EventType = "code_generate"
+	EventCodeLogin       EventType = "code_login"
 )
 
 type Event struct {

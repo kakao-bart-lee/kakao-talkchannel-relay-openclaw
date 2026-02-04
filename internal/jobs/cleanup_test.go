@@ -136,23 +136,43 @@ func (m *mockInboundMsgRepo) CountByAccountIDSince(ctx context.Context, accountI
 	return 0, nil
 }
 
-type mockOAuthStateRepo struct {
+func (m *mockInboundMsgRepo) FindByConversationKey(ctx context.Context, conversationKey string, limit, offset int) ([]model.InboundMessage, error) {
+	return nil, nil
+}
+
+func (m *mockInboundMsgRepo) CountByConversationKey(ctx context.Context, conversationKey string) (int, error) {
+	return 0, nil
+}
+
+func (m *mockInboundMsgRepo) CountByConversationKeySince(ctx context.Context, conversationKey string, since time.Time) (int, error) {
+	return 0, nil
+}
+
+type mockPortalAccessCodeRepo struct {
 	deleteExpiredCount int64
 }
 
-func (m *mockOAuthStateRepo) FindByState(ctx context.Context, state string) (*model.OAuthState, error) {
+func (m *mockPortalAccessCodeRepo) Create(ctx context.Context, params model.CreatePortalAccessCodeParams) (*model.PortalAccessCode, error) {
 	return nil, nil
 }
 
-func (m *mockOAuthStateRepo) Create(ctx context.Context, params model.CreateOAuthStateParams) (*model.OAuthState, error) {
+func (m *mockPortalAccessCodeRepo) FindActiveByCode(ctx context.Context, code string) (*model.PortalAccessCode, error) {
 	return nil, nil
 }
 
-func (m *mockOAuthStateRepo) Delete(ctx context.Context, id string) error {
+func (m *mockPortalAccessCodeRepo) FindActiveByConversationKey(ctx context.Context, conversationKey string) (*model.PortalAccessCode, error) {
+	return nil, nil
+}
+
+func (m *mockPortalAccessCodeRepo) MarkUsed(ctx context.Context, code string) error {
 	return nil
 }
 
-func (m *mockOAuthStateRepo) DeleteExpired(ctx context.Context) (int64, error) {
+func (m *mockPortalAccessCodeRepo) UpdateLastAccessed(ctx context.Context, code string) error {
+	return nil
+}
+
+func (m *mockPortalAccessCodeRepo) DeleteExpired(ctx context.Context) (int64, error) {
 	return m.deleteExpiredCount, nil
 }
 
@@ -211,12 +231,12 @@ func TestCleanupJob(t *testing.T) {
 	t.Run("starts and stops without panic", func(t *testing.T) {
 		adminRepo := &mockAdminSessionRepo{}
 		portalRepo := &mockPortalSessionRepo{}
+		portalAccessRepo := &mockPortalAccessCodeRepo{}
 		pairingRepo := &mockPairingCodeRepo{}
 		msgRepo := &mockInboundMsgRepo{}
-		oauthStateRepo := &mockOAuthStateRepo{}
 		sessionRepo := &mockSessionRepo{}
 
-		job := NewCleanupJob(adminRepo, portalRepo, pairingRepo, msgRepo, oauthStateRepo, sessionRepo, 100*time.Millisecond)
+		job := NewCleanupJob(adminRepo, portalRepo, portalAccessRepo, pairingRepo, msgRepo, sessionRepo, 100*time.Millisecond)
 
 		job.Start()
 		time.Sleep(50 * time.Millisecond)
@@ -226,12 +246,12 @@ func TestCleanupJob(t *testing.T) {
 	t.Run("runs cleanup on start", func(t *testing.T) {
 		adminRepo := &mockAdminSessionRepo{deleteExpiredCount: 2}
 		portalRepo := &mockPortalSessionRepo{deleteExpiredCount: 3}
+		portalAccessRepo := &mockPortalAccessCodeRepo{deleteExpiredCount: 4}
 		pairingRepo := &mockPairingCodeRepo{deleteExpiredCount: 1}
 		msgRepo := &mockInboundMsgRepo{markExpiredCount: 5}
-		oauthStateRepo := &mockOAuthStateRepo{deleteExpiredCount: 4}
 		sessionRepo := &mockSessionRepo{deleteExpiredCount: 6}
 
-		job := NewCleanupJob(adminRepo, portalRepo, pairingRepo, msgRepo, oauthStateRepo, sessionRepo, 1*time.Hour)
+		job := NewCleanupJob(adminRepo, portalRepo, portalAccessRepo, pairingRepo, msgRepo, sessionRepo, 1*time.Hour)
 
 		job.Start()
 		time.Sleep(10 * time.Millisecond)

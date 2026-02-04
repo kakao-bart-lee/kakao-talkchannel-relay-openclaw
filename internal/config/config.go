@@ -18,14 +18,6 @@ type Config struct {
 	QueueTTLSeconds      int    `env:"QUEUE_TTL_SECONDS" envDefault:"900"`
 	CallbackTTLSeconds   int    `env:"CALLBACK_TTL_SECONDS" envDefault:"55"`
 	LogLevel             string `env:"LOG_LEVEL" envDefault:"info"`
-
-	// OAuth Configuration
-	GoogleClientID      string `env:"GOOGLE_CLIENT_ID"`
-	GoogleClientSecret  string `env:"GOOGLE_CLIENT_SECRET"`
-	TwitterClientID     string `env:"TWITTER_CLIENT_ID"`
-	TwitterClientSecret string `env:"TWITTER_CLIENT_SECRET"`
-	OAuthStateSecret    string `env:"OAUTH_STATE_SECRET"`
-	OAuthRedirectBase   string `env:"OAUTH_REDIRECT_BASE_URL"`
 }
 
 func (c *Config) QueueTTL() time.Duration {

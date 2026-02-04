@@ -9,13 +9,9 @@ CLOUD_SQL_INSTANCE="${CLOUD_SQL_INSTANCE:?CLOUD_SQL_INSTANCE is required}"
 VPC_CONNECTOR="${VPC_CONNECTOR:?VPC_CONNECTOR is required}"
 IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${SERVICE_NAME}"
 
-# OAuth Redirect Base URL (required for OAuth to work)
-OAUTH_REDIRECT_BASE_URL="${OAUTH_REDIRECT_BASE_URL:?OAUTH_REDIRECT_BASE_URL is required}"
-
 echo "Deploying $SERVICE_NAME to Cloud Run..."
 echo "  Project: $PROJECT_ID"
 echo "  Region:  $REGION"
-echo "  OAuth URL: $OAUTH_REDIRECT_BASE_URL"
 
 # Build frontend assets
 echo ""
@@ -49,17 +45,12 @@ gcloud run deploy "$SERVICE_NAME" \
   --cpu-boost \
   --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
   --vpc-connector "$VPC_CONNECTOR" \
-  --set-env-vars "LOG_LEVEL=info,CALLBACK_TTL_SECONDS=55,OAUTH_REDIRECT_BASE_URL=${OAUTH_REDIRECT_BASE_URL}" \
+  --set-env-vars "LOG_LEVEL=info,CALLBACK_TTL_SECONDS=55" \
   --set-secrets "DATABASE_URL=${SECRET_PREFIX:-kakao-relay}-database-url:latest,\
 REDIS_URL=${SECRET_PREFIX:-kakao-relay}-redis-url:latest,\
 ADMIN_PASSWORD=${SECRET_PREFIX:-kakao-relay}-admin-password:latest,\
 PORTAL_SESSION_SECRET=${SECRET_PREFIX:-kakao-relay}-session-secret:latest,\
-ADMIN_SESSION_SECRET=${SECRET_PREFIX:-kakao-relay}-admin-session-secret:latest,\
-GOOGLE_CLIENT_ID=${SECRET_PREFIX:-kakao-relay}-google-client-id:latest,\
-GOOGLE_CLIENT_SECRET=${SECRET_PREFIX:-kakao-relay}-google-client-secret:latest,\
-TWITTER_CLIENT_ID=${SECRET_PREFIX:-kakao-relay}-twitter-client-id:latest,\
-TWITTER_CLIENT_SECRET=${SECRET_PREFIX:-kakao-relay}-twitter-client-secret:latest,\
-OAUTH_STATE_SECRET=${SECRET_PREFIX:-kakao-relay}-oauth-state-secret:latest"
+ADMIN_SESSION_SECRET=${SECRET_PREFIX:-kakao-relay}-admin-session-secret:latest"
 
 echo ""
 echo "Deployment complete!"
