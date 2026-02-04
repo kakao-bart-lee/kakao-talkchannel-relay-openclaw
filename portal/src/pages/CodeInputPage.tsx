@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Key, ArrowRight, Info, CheckCircle2 } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import * as api from '../lib/api';
 
 export default function CodeInputPage() {
@@ -48,77 +51,108 @@ export default function CodeInputPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            포털 접속 코드 입력
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            카카오톡에서 /code 명령어로 받은 8자리 코드를 입력하세요
+    <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
+            <Key className="h-6 w-6 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">포털 접속</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            카카오톡에서 발급받은 접속 코드를 입력하세요
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="code" className="sr-only">
-                접속 코드
-              </label>
-              <input
-                id="code"
-                name="code"
-                type="text"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm text-center tracking-widest font-mono text-lg"
-                placeholder="XXXX-XXXX"
-                value={code}
-                onChange={handleCodeChange}
-                maxLength={9}
-                autoComplete="off"
-                disabled={loading}
-              />
-            </div>
-          </div>
+        {/* Main Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>접속 코드 입력</CardTitle>
+            <CardDescription>
+              8자리 코드를 입력하면 대화 내역과 통계를 확인할 수 있습니다
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="code" className="text-sm font-medium">
+                  접속 코드
+                </label>
+                <input
+                  id="code"
+                  name="code"
+                  type="text"
+                  required
+                  className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-center text-lg font-mono tracking-widest ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="XXXX-XXXX"
+                  value={code}
+                  onChange={handleCodeChange}
+                  maxLength={9}
+                  autoComplete="off"
+                  disabled={loading}
+                  autoFocus
+                />
+              </div>
 
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
+              {error && (
+                <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
+                  <p className="text-sm text-destructive">
                     {error}
-                  </h3>
+                  </p>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={loading || code.length !== 9}
+                className="w-full"
+                size="lg"
+              >
+                {loading ? (
+                  '로그인 중...'
+                ) : (
+                  <>
+                    로그인
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Instructions Card */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="font-medium mb-2">코드 받는 방법</p>
+                  <ol className="space-y-1.5 text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <span className="font-medium text-primary">1.</span>
+                      <span>카카오톡 채팅방에서 <code className="px-1.5 py-0.5 rounded bg-muted font-mono text-xs">/code</code> 입력</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-medium text-primary">2.</span>
+                      <span>받은 8자리 코드를 위에 입력</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-medium text-primary">3.</span>
+                      <span>코드는 30분 동안 유효합니다</span>
+                    </li>
+                  </ol>
                 </div>
               </div>
             </div>
-          )}
+          </CardContent>
+        </Card>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading || code.length !== 9}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? '로그인 중...' : '로그인'}
-            </button>
-          </div>
-        </form>
-
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-900 mb-2">
-            💡 코드 받는 방법
-          </h3>
-          <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-            <li>카카오톡 채팅방에서 /code 입력</li>
-            <li>받은 8자리 코드를 위에 입력</li>
-            <li>코드는 30분 동안 유효합니다</li>
-          </ol>
-        </div>
-
-        <div className="text-center text-xs text-gray-500">
-          <p>
-            이 코드로 대화 내역과 통계를 조회할 수 있습니다 (읽기 전용)
-          </p>
+        {/* Footer Note */}
+        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          <p>읽기 전용 모드로 안전하게 조회할 수 있습니다</p>
         </div>
       </div>
     </div>
