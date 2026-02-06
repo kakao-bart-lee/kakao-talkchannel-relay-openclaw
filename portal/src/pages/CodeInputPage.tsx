@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Key, ArrowRight, Info, CheckCircle2 } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Key, ArrowRight, Info, CheckCircle2, BarChart3 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import * as api from '../lib/api';
@@ -60,7 +60,7 @@ export default function CodeInputPage() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight">포털 접속</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            카카오톡에서 발급받은 접속 코드를 입력하세요
+            카카오 톡채널 채팅방에서 발급받은 접속 코드를 입력하세요
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export default function CodeInputPage() {
           <CardHeader>
             <CardTitle>접속 코드 입력</CardTitle>
             <CardDescription>
-              8자리 코드를 입력하면 대화 내역과 통계를 확인할 수 있습니다
+              8자리 코드를 입력하면 relay 통계를 확인할 수 있습니다
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -150,9 +150,21 @@ export default function CodeInputPage() {
         </Card>
 
         {/* Footer Note */}
-        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          <p>읽기 전용 모드로 안전하게 조회할 수 있습니다</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <p>읽기 전용 모드로 안전하게 조회할 수 있습니다</p>
+          </div>
+
+          <div className="flex items-center justify-center">
+            <Link
+              to="/total"
+              className="flex items-center gap-2 text-sm text-primary hover:underline"
+            >
+              <BarChart3 className="h-4 w-4" />
+              <span>전체 통계 보기</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

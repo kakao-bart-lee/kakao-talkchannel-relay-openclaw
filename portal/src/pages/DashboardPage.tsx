@@ -182,12 +182,12 @@ export default function DashboardPage() {
             >
               http://pf.kakao.com/_scexbC
             </a>
-            {' '}혹은 카카오톡에서 'samantha' 검색
+            {' '}혹은 카카오 톡채널 채팅방에서 'samantha' 검색
           </p>
         )}
         {isCodeSession && (
           <p className="text-muted-foreground">
-            코드로 접속하여 대화 내역과 통계를 조회하고 있습니다
+            코드로 접속하여 relay 통계를 조회하고 있습니다
           </p>
         )}
       </div>

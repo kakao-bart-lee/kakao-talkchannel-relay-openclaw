@@ -15,7 +15,7 @@ export default function App() {
       <Routes>
         <Route path="/code" element={<CodeInputPage />} />
         <Route path="/login" element={<AuthPage />} />
-        <Route path="/demo" element={<DemoPage />} />
+        <Route path="/total" element={<DemoPage />} />
 
         <Route element={<Layout />}>
           <Route path="/" element={<DashboardPage />} />
