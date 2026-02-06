@@ -82,7 +82,7 @@ export default function Layout(): React.ReactElement {
     try {
       await api.logout();
     } finally {
-      navigate('/login');
+      navigate('/code');
     }
   };
 

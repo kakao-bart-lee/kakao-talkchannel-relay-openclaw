@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import AuthPage from './pages/AuthPage';
 import CodeInputPage from './pages/CodeInputPage';
 import DashboardPage from './pages/DashboardPage';
 import DemoPage from './pages/DemoPage';
@@ -14,7 +13,6 @@ export default function App() {
     <BrowserRouter basename="/portal">
       <Routes>
         <Route path="/code" element={<CodeInputPage />} />
-        <Route path="/login" element={<AuthPage />} />
         <Route path="/total" element={<DemoPage />} />
 
         <Route element={<Layout />}>

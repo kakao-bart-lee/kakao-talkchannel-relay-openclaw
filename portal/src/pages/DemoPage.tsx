@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CheckCircle2, MessageSquare, Users, Activity, LogIn } from 'lucide-react';
-import { Button } from '../components/ui/button';
+import { CheckCircle2, MessageSquare, Users, Activity } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { api, type PublicStats } from '../lib/api';
@@ -38,30 +36,22 @@ export default function DemoPage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="mx-auto max-w-5xl space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold">서비스 상태</h1>
-              {stats?.isPublic && (
-                <Badge variant="secondary">공개</Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground">
-              카카오톡 채널 릴레이 서비스 실시간 현황
-            </p>
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">서비스 상태</h1>
+            {stats?.isPublic && (
+              <Badge variant="secondary">공개</Badge>
+            )}
           </div>
-          <Link to="/login">
-            <Button>
-              <LogIn className="mr-2 h-4 w-4" />
-              로그인
-            </Button>
-          </Link>
+          <p className="text-muted-foreground">
+            카카오톡 채널 릴레이 서비스 실시간 현황
+          </p>
         </div>
 
         <Card className="border-blue-500/50 bg-blue-500/5">
           <CardContent className="py-3">
             <p className="text-sm text-blue-600 dark:text-blue-400">
-              시스템 전체 통계입니다. 개인 통계를 보려면 로그인하거나 카카오 톡채널 채팅방에서 /status 명령어를 사용하세요.
+              시스템 전체 통계입니다. 개인 통계를 보려면 카카오 톡채널 채팅방에서 /status 명령어를 사용하세요.
             </p>
           </CardContent>
         </Card>
@@ -144,7 +134,7 @@ export default function DemoPage() {
           <CardHeader>
             <CardTitle>기능 안내</CardTitle>
             <CardDescription>
-              로그인 후 사용할 수 있는 기능들입니다
+              코드 접속 후 사용할 수 있는 기능들입니다
             </CardDescription>
           </CardHeader>
           <CardContent>
