@@ -302,7 +302,7 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 				"코드: %s\n"+
 				"유효시간: %d분\n\n"+
 				"이 코드로 포털에서 대화 내역과 통계를 확인할 수 있습니다.\n\n"+
-				"포털 주소:\nhttps://relay.openclaw.ai/portal/code",
+				"포털 주소:\nhttps://{YOUR_PORTAL_DOMAIN}/portal/code",
 			code.Code,
 			expiresIn,
 		))
