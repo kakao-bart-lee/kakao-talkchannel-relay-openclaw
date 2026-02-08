@@ -6,9 +6,8 @@ dist/
 *.tsbuildinfo
 
 # Environment files
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 
 # IDE
 .vscode/
@@ -29,5 +28,5 @@ bun.lock
 *.log
 logs/
 
-# Go binary
-server
+# Go binary (root level only)
+/server

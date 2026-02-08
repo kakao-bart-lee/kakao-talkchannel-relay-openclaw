@@ -56,6 +56,7 @@ type KakaoHandler struct {
 	portalAccessService *service.PortalAccessService
 	broker              *sse.Broker
 	callbackTTL         time.Duration
+	portalBaseURL       string
 }
 
 func NewKakaoHandler(
@@ -65,6 +66,7 @@ func NewKakaoHandler(
 	portalAccessService *service.PortalAccessService,
 	broker *sse.Broker,
 	callbackTTL time.Duration,
+	portalBaseURL string,
 ) *KakaoHandler {
 	return &KakaoHandler{
 		convService:         convService,
@@ -73,6 +75,7 @@ func NewKakaoHandler(
 		portalAccessService: portalAccessService,
 		broker:              broker,
 		callbackTTL:         callbackTTL,
+		portalBaseURL:       portalBaseURL,
 	}
 }
 
@@ -297,15 +300,18 @@ func (h *KakaoHandler) handleCommand(r *http.Request, cmd *Command, conv *model.
 		audit.LogFromRequest(r, auditEvent)
 
 		expiresIn := int(time.Until(code.ExpiresAt).Minutes())
-		return NewTextResponse(fmt.Sprintf(
+		msg := fmt.Sprintf(
 			"🔑 포털 접속 코드\n\n"+
 				"코드: %s\n"+
 				"유효시간: %d분\n\n"+
-				"이 코드로 포털에서 대화 내역과 통계를 확인할 수 있습니다.\n\n"+
-				"포털 주소:\nhttps://{YOUR_PORTAL_DOMAIN}/portal/code",
+				"이 코드로 포털에서 대화 내역과 통계를 확인할 수 있습니다.",
 			code.Code,
 			expiresIn,
-		))
+		)
+		if h.portalBaseURL != "" {
+			msg += fmt.Sprintf("\n\n포털 주소:\n%s/portal/code", h.portalBaseURL)
+		}
+		return NewTextResponse(msg)
 
 	case "HELP":
 		return NewTextResponse(

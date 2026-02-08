@@ -93,13 +93,13 @@ func main() {
 	)
 	kakaoSignatureMiddleware := middleware.NewKakaoSignatureMiddleware(cfg.KakaoSignatureSecret)
 
-	isProduction := os.Getenv("FLY_APP_NAME") != ""
+	isProduction := os.Getenv("K_SERVICE") != "" || os.Getenv("FLY_APP_NAME") != ""
 	csrfMiddleware := middleware.NewCSRFMiddleware(isProduction)
 	bodyLimitMiddleware := middleware.NewBodyLimitMiddleware(0)
 	securityHeadersMiddleware := middleware.NewSecurityHeadersMiddleware(isProduction)
 
 	kakaoHandler := handler.NewKakaoHandler(
-		convService, sessionService, messageService, portalAccessService, broker, cfg.CallbackTTL(),
+		convService, sessionService, messageService, portalAccessService, broker, cfg.CallbackTTL(), cfg.PortalBaseURL,
 	)
 	eventsHandler := handler.NewEventsHandler(broker, messageService)
 	openclawHandler := handler.NewOpenClawHandler(messageService, kakaoService)

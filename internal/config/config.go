@@ -18,6 +18,7 @@ type Config struct {
 	QueueTTLSeconds      int    `env:"QUEUE_TTL_SECONDS" envDefault:"900"`
 	CallbackTTLSeconds   int    `env:"CALLBACK_TTL_SECONDS" envDefault:"55"`
 	LogLevel             string `env:"LOG_LEVEL" envDefault:"info"`
+	PortalBaseURL        string `env:"PORTAL_BASE_URL" envDefault:""`
 }
 
 func (c *Config) QueueTTL() time.Duration {
