@@ -69,6 +69,9 @@ go run ./cmd/server
 - `Dockerfile`: 런타임 이미지 빌드
 - `deploy.sh`: Cloud Run 배포 스크립트 (프로젝트/리전 값 확인 필요)
 
+## 관련 프로젝트
+- [openclaw-kakao-talkchannel-plugin](https://github.com/kakao-bart-lee/openclaw-kakao-talkchannel-plugin): OpenClaw 카카오톡 채널 플러그인
+
 ## 문서
 - `docs/setup-guide.md`: **설정 가이드** (카카오 채널 + 오픈빌더 + 릴레이 서버 전체 설정)
 - `docs/architecture.md`: 시스템 아키텍처
