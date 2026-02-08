@@ -72,14 +72,43 @@ curl -X POST https://kakao-talkchannel-relay-....run.app/admin/api/accounts \
 
 ### STEP 2: OpenClaw 연동 설정
 
-#### 2-1. 환경변수 설정
+#### 2-1. OpenClaw 플러그인 사용 (권장)
+
+[openclaw-kakao-talkchannel-plugin](https://github.com/kakao-bart-lee/openclaw-kakao-talkchannel-plugin)을 설치하면 SSE 연결, 메시지 폴링, 응답 전송, 페어링 등이 자동 처리됩니다.
+
+```bash
+openclaw plugins install @openclaw/kakao-talkchannel
+```
+
+플러그인 설정에서 `relayUrl`과 `relayToken`을 지정합니다:
+
+```json
+{
+  "channels": {
+    "kakao-talkchannel": {
+      "accounts": {
+        "default": {
+          "relayUrl": "https://{YOUR_RELAY_SERVER}",
+          "relayToken": "<발급받은_토큰>"
+        }
+      }
+    }
+  }
+}
+```
+
+#### 2-2. 직접 연동 (플러그인 미사용)
+
+플러그인 없이 직접 릴레이 서버 API를 호출할 수도 있습니다.
+
+**환경변수 설정:**
 
 ```env
 KAKAO_RELAY_URL=https://{YOUR_RELAY_SERVER}
 KAKAO_RELAY_TOKEN=<발급받은_64자_토큰>
 ```
 
-#### 2-2. OpenClaw 구현 요구사항
+**구현 요구사항:**
 
 **필수 구현:**
 
