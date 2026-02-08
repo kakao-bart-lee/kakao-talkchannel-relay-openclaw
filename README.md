@@ -70,7 +70,8 @@ go run ./cmd/server
 - `deploy.sh`: Cloud Run 배포 스크립트 (프로젝트/리전 값 확인 필요)
 
 ## 문서
+- `docs/setup-guide.md`: **설정 가이드** (카카오 채널 + 오픈빌더 + 릴레이 서버 전체 설정)
 - `docs/architecture.md`: 시스템 아키텍처
-- `docs/integration-guide.md`: 카카오/오픈클로 연동 가이드
+- `docs/integration-guide.md`: OpenClaw 연동 가이드
 - `docs/pairing-flow.md`: 페어링 플로우
 - `docs/api-spec.md`: API 스펙
