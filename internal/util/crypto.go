@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const tokenBytes = 32
@@ -31,4 +33,16 @@ func HmacSHA256(secret, data string) string {
 
 func ConstantTimeEqual(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+func MaskCode(code string) string {
+	if len(code) <= 4 {
+		return "****"
+	}
+	return code[:4] + "-****"
 }

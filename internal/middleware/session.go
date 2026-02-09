@@ -41,25 +41,25 @@ func GetPortalUser(ctx context.Context) *model.PortalUser {
 // Admin Session Middleware
 
 type AdminSessionMiddleware struct {
-	sessionRepo   repository.AdminSessionRepository
-	adminPassword string
-	sessionSecret string
+	sessionRepo       repository.AdminSessionRepository
+	adminPasswordHash string
+	sessionSecret     string
 }
 
 func NewAdminSessionMiddleware(
 	sessionRepo repository.AdminSessionRepository,
-	adminPassword, sessionSecret string,
+	adminPasswordHash, sessionSecret string,
 ) *AdminSessionMiddleware {
 	return &AdminSessionMiddleware{
-		sessionRepo:   sessionRepo,
-		adminPassword: adminPassword,
-		sessionSecret: sessionSecret,
+		sessionRepo:       sessionRepo,
+		adminPasswordHash: adminPasswordHash,
+		sessionSecret:     sessionSecret,
 	}
 }
 
 func (m *AdminSessionMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if m.adminPassword == "" {
+		if m.adminPasswordHash == "" {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"error": "Admin not configured",
 			})
@@ -97,7 +97,7 @@ func (m *AdminSessionMiddleware) Handler(next http.Handler) http.Handler {
 }
 
 func (m *AdminSessionMiddleware) ValidatePassword(password string) bool {
-	return util.ConstantTimeEqual(password, m.adminPassword)
+	return util.CheckPasswordHash(password, m.adminPasswordHash)
 }
 
 // Portal Session Middleware

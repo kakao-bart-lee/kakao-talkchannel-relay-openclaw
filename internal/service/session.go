@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -77,7 +78,6 @@ func (s *SessionService) CreateSession(ctx context.Context) (*CreateSessionResul
 	expiresAt := time.Now().Add(sessionPairingExpiryMins * time.Minute)
 
 	session, err := s.sessionRepo.Create(ctx, model.CreateSessionParams{
-		SessionToken:     token,
 		SessionTokenHash: tokenHash,
 		PairingCode:      pairingCode,
 		ExpiresAt:        expiresAt,
@@ -88,7 +88,7 @@ func (s *SessionService) CreateSession(ctx context.Context) (*CreateSessionResul
 
 	log.Info().
 		Str("sessionId", session.ID).
-		Str("pairingCode", pairingCode).
+		Str("pairingCode", util.MaskCode(pairingCode)).
 		Time("expiresAt", expiresAt).
 		Msg("session created")
 
@@ -155,7 +155,7 @@ func (s *SessionService) VerifyPairingCode(ctx context.Context, code, conversati
 	}
 
 	if session == nil {
-		log.Warn().Str("code", normalizedCode).Msg("invalid session pairing code")
+		log.Warn().Str("code", util.MaskCode(normalizedCode)).Msg("invalid session pairing code")
 		return SessionPairResult{Success: false, Error: "INVALID_CODE"}
 	}
 
@@ -212,7 +212,6 @@ func (s *SessionService) createAccountForSessionTx(ctx context.Context, accountR
 	tokenHash := util.HashToken(token)
 
 	account, err := accountRepo.Create(ctx, model.CreateAccountParams{
-		RelayToken:      token,
 		RelayTokenHash:  tokenHash,
 		Mode:            model.AccountModeRelay,
 		RateLimitPerMin: 60,
@@ -236,12 +235,18 @@ func (s *SessionService) PublishPairingComplete(ctx context.Context, session *mo
 		kakaoUserID = parts[1]
 	}
 
-	eventData := fmt.Sprintf(`{"kakaoUserId":"%s","pairedAt":"%s","accountId":"%s"}`,
-		kakaoUserID, time.Now().Format(time.RFC3339), *session.AccountID)
+	eventDataBytes, err := json.Marshal(map[string]string{
+		"kakaoUserId": kakaoUserID,
+		"pairedAt":    time.Now().Format(time.RFC3339),
+		"accountId":   *session.AccountID,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal pairing complete event: %w", err)
+	}
 
 	event := sse.Event{
 		Type: "pairing_complete",
-		Data: []byte(eventData),
+		Data: eventDataBytes,
 	}
 
 	// Publish to session channel (for pending SSE connections)
@@ -264,11 +269,16 @@ func (s *SessionService) PublishPairingExpired(ctx context.Context, sessionID st
 		return nil // No account to notify
 	}
 
-	eventData := fmt.Sprintf(`{"reason":"%s"}`, reason)
+	eventDataBytes, err := json.Marshal(map[string]string{
+		"reason": reason,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal pairing expired event: %w", err)
+	}
 
 	return s.broker.Publish(ctx, *session.AccountID, sse.Event{
 		Type: "pairing_expired",
-		Data: []byte(eventData),
+		Data: eventDataBytes,
 	})
 }
 

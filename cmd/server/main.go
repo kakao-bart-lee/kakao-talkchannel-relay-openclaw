@@ -36,6 +36,11 @@ func main() {
 
 	setLogLevel(cfg.LogLevel)
 
+	isProduction := os.Getenv("K_SERVICE") != "" || os.Getenv("FLY_APP_NAME") != ""
+	if err := cfg.Validate(isProduction); err != nil {
+		log.Fatal().Err(err).Msg("invalid configuration")
+	}
+
 	db, err := database.Connect(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to database")
@@ -78,22 +83,27 @@ func main() {
 	adminService := service.NewAdminService(
 		db.DB, adminSessionRepo, accountRepo, convRepo,
 		inboundMsgRepo, outboundMsgRepo, portalUserRepo, sessionRepo,
-		cfg.AdminPassword, cfg.AdminSessionSecret,
+		cfg.AdminPasswordHash, cfg.AdminSessionSecret,
 	)
 	portalService := service.NewPortalService(
 		portalUserRepo, portalSessionRepo, accountRepo,
 		cfg.PortalSessionSecret,
 	)
 	sessionService := service.NewSessionService(db, sessionRepo, accountRepo, broker)
+	ipRateLimiter := service.NewRateLimiter(redisClient.Client)
 
 	authMiddleware := middleware.NewAuthMiddleware(accountRepo, sessionRepo)
 	rateLimitMiddleware := middleware.NewRedisRateLimitMiddleware(redisClient.Client)
 	adminSessionMiddleware := middleware.NewAdminSessionMiddleware(
-		adminSessionRepo, cfg.AdminPassword, cfg.AdminSessionSecret,
+		adminSessionRepo, cfg.AdminPasswordHash, cfg.AdminSessionSecret,
 	)
 	kakaoSignatureMiddleware := middleware.NewKakaoSignatureMiddleware(cfg.KakaoSignatureSecret)
+	portalSessionMiddleware := middleware.NewPortalSessionMiddleware(
+		portalSessionRepo, portalUserRepo, cfg.PortalSessionSecret,
+	)
+	sessionCreateRateLimit := middleware.NewIPRateLimitMiddleware(ipRateLimiter, 10, 5*time.Minute, "session_create")
+	sessionStatusRateLimit := middleware.NewIPRateLimitMiddleware(ipRateLimiter, 30, 1*time.Minute, "session_status")
 
-	isProduction := os.Getenv("K_SERVICE") != "" || os.Getenv("FLY_APP_NAME") != ""
 	csrfMiddleware := middleware.NewCSRFMiddleware(isProduction)
 	bodyLimitMiddleware := middleware.NewBodyLimitMiddleware(0)
 	securityHeadersMiddleware := middleware.NewSecurityHeadersMiddleware(isProduction)
@@ -149,7 +159,8 @@ func main() {
 	})
 
 	r.Route("/v1/sessions", func(r chi.Router) {
-		r.Mount("/", sessionHandler.Routes())
+		r.With(sessionCreateRateLimit.Handler).Post("/create", sessionHandler.CreateSession)
+		r.With(sessionStatusRateLimit.Handler).Get("/{sessionToken}/status", sessionHandler.GetSessionStatus)
 	})
 
 	r.Route("/admin", func(r chi.Router) {
@@ -162,7 +173,11 @@ func main() {
 	r.Route("/portal", func(r chi.Router) {
 		r.Use(securityHeadersMiddleware.Handler)
 		r.Use(csrfMiddleware.Handler)
-		r.Mount("/", portalHandler.Routes())
+		r.Mount("/", portalHandler.PublicRoutes())
+		r.Group(func(r chi.Router) {
+			r.Use(portalSessionMiddleware.Handler)
+			r.Mount("/", portalHandler.AuthenticatedRoutes())
+		})
 		r.NotFound(handler.StaticFileServer("static/portal", "/portal").ServeHTTP)
 	})
 

@@ -7,7 +7,6 @@ import (
 
 type Session struct {
 	ID                    string           `db:"id" json:"id"`
-	SessionToken          string           `db:"session_token" json:"-"`
 	SessionTokenHash      string           `db:"session_token_hash" json:"-"`
 	PairingCode           string           `db:"pairing_code" json:"pairingCode"`
 	Status                SessionStatus    `db:"status" json:"status"`
@@ -21,7 +20,6 @@ type Session struct {
 }
 
 type CreateSessionParams struct {
-	SessionToken     string
 	SessionTokenHash string
 	PairingCode      string
 	ExpiresAt        time.Time

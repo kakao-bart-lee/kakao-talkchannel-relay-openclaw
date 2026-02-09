@@ -29,6 +29,7 @@ func NewKakaoSignatureMiddleware(secret string) *KakaoSignatureMiddleware {
 func (m *KakaoSignatureMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if m.secret == "" {
+			log.Warn().Msg("kakao signature verification bypassed: KAKAO_SIGNATURE_SECRET is not configured")
 			next.ServeHTTP(w, r)
 			return
 		}
