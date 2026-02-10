@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,7 +19,10 @@ type SPAHandler struct {
 }
 
 func NewSPAHandler(staticDir string, routePrefix string) *SPAHandler {
-	absDir, _ := filepath.Abs(staticDir)
+	absDir, err := filepath.Abs(staticDir)
+	if err != nil {
+		panic(fmt.Sprintf("failed to resolve static dir path %q: %v", staticDir, err))
+	}
 	return &SPAHandler{
 		staticDir:    staticDir,
 		indexFile:    "index.html",
@@ -55,7 +59,7 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Path traversal protection
 	absFilePath, err := filepath.Abs(filePath)
-	if err != nil || !strings.HasPrefix(absFilePath, h.absStaticDir+string(filepath.Separator)) && absFilePath != h.absStaticDir {
+	if err != nil || (!strings.HasPrefix(absFilePath, h.absStaticDir+string(filepath.Separator)) && absFilePath != h.absStaticDir) {
 		log.Warn().Str("path", path).Msg("path traversal attempt blocked")
 		http.NotFound(w, r)
 		return

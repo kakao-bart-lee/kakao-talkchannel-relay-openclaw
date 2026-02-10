@@ -75,8 +75,20 @@ func (h *PortalHandler) AuthenticatedRoutes() chi.Router {
 	return r
 }
 
-func (h *PortalHandler) Logout(w http.ResponseWriter, r *http.Request) {
+func (h *PortalHandler) requireUser(w http.ResponseWriter, r *http.Request) *model.PortalUser {
 	user := middleware.GetPortalUser(r.Context())
+	if user == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
+		return nil
+	}
+	return user
+}
+
+func (h *PortalHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	cookie, err := r.Cookie(middleware.PortalSessionCookie)
 	if err == nil && cookie.Value != "" {
@@ -97,7 +109,10 @@ func (h *PortalHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PortalHandler) Me(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
@@ -139,7 +154,10 @@ func (h *PortalHandler) GetPublicStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PortalHandler) GetStats(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	conversations, err := h.convService.ListByAccountID(r.Context(), user.AccountID)
 	if err != nil {
@@ -168,7 +186,10 @@ func (h *PortalHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PortalHandler) GeneratePairingCode(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	var req struct {
 		ExpirySeconds int `json:"expirySeconds"`
@@ -189,7 +210,10 @@ func (h *PortalHandler) GeneratePairingCode(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *PortalHandler) ListConnections(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	conversations, err := h.convService.ListByAccountID(r.Context(), user.AccountID)
 	if err != nil {
@@ -210,7 +234,10 @@ func (h *PortalHandler) ListConnections(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PortalHandler) UnpairConnection(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	conversationKey := chi.URLParam(r, "conversationKey")
 	if conversationKey == "" {
@@ -239,7 +266,10 @@ func (h *PortalHandler) UnpairConnection(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *PortalHandler) BlockConnection(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	conversationKey := chi.URLParam(r, "conversationKey")
 	if conversationKey == "" {
@@ -278,7 +308,10 @@ func (h *PortalHandler) BlockConnection(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PortalHandler) GetToken(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	account, err := h.portalService.GetAccountByID(r.Context(), user.AccountID)
 	if err != nil {
@@ -301,7 +334,10 @@ func (h *PortalHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PortalHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	account, newToken, err := h.portalService.RegenerateToken(r.Context(), user.AccountID)
 	if err != nil {
@@ -326,7 +362,10 @@ func (h *PortalHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PortalHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	var req struct {
 		Confirm string `json:"confirm"`
@@ -361,7 +400,10 @@ func (h *PortalHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PortalHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
-	user := middleware.GetPortalUser(r.Context())
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	msgType := r.URL.Query().Get("type")
 	if msgType != "" && msgType != "inbound" && msgType != "outbound" {

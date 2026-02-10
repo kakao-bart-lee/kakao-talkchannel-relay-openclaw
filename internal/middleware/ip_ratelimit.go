@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -27,6 +28,9 @@ func NewIPRateLimitMiddleware(limiter *service.RateLimiter, limit int, window ti
 func (m *IPRateLimitMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := r.RemoteAddr
+		if host, _, err := net.SplitHostPort(ip); err == nil {
+			ip = host
+		}
 
 		key := fmt.Sprintf("ip:%s:%s", m.prefix, ip)
 		allowed, resetAt := m.limiter.CheckLimit(r.Context(), key, m.limit, m.window)
