@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/kakao-bart-lee/kakao-talkchannel-relay-openclaw/compare/kakao-talkchannel-relay-openclaw-v0.2.0...kakao-talkchannel-relay-openclaw-v0.3.0) (2026-02-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **security:** ADMIN_PASSWORD 환경변수가 ADMIN_PASSWORD_HASH로 변경됨. bcrypt 해시를 생성하려면: go run scripts/hash-password.go <password>
+
+### Bug Fixes
+
+* **security:** address medium+ security vulnerabilities ([#7](https://github.com/kakao-bart-lee/kakao-talkchannel-relay-openclaw/issues/7)) ([0043154](https://github.com/kakao-bart-lee/kakao-talkchannel-relay-openclaw/commit/004315487cee258d0f67de5082cf993e9741e6ad))
+
 ## [0.2.0](https://github.com/kakao-bart-lee/kakao-talkchannel-relay-openclaw/compare/kakao-talkchannel-relay-openclaw-v0.1.0...kakao-talkchannel-relay-openclaw-v0.2.0) (2026-02-08)
 
 
