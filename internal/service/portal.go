@@ -62,7 +62,7 @@ func (s *PortalService) RegenerateToken(ctx context.Context, accountID string) (
 	}
 
 	tokenHash := util.HashToken(newToken)
-	account, err := s.accountRepo.UpdateToken(ctx, accountID, newToken, tokenHash)
+	account, err := s.accountRepo.UpdateToken(ctx, accountID, tokenHash)
 	if err != nil {
 		return nil, "", err
 	}

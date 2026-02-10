@@ -75,10 +75,10 @@ func (r *sessionRepo) FindByPairingCode(ctx context.Context, code string) (*mode
 func (r *sessionRepo) Create(ctx context.Context, params model.CreateSessionParams) (*model.Session, error) {
 	var session model.Session
 	err := r.db.GetContext(ctx, &session, `
-		INSERT INTO sessions (session_token, session_token_hash, pairing_code, expires_at, metadata)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO sessions (session_token_hash, pairing_code, expires_at, metadata)
+		VALUES ($1, $2, $3, $4)
 		RETURNING *
-	`, params.SessionToken, params.SessionTokenHash, params.PairingCode, params.ExpiresAt, params.Metadata)
+	`, params.SessionTokenHash, params.PairingCode, params.ExpiresAt, params.Metadata)
 	if err != nil {
 		return nil, err
 	}

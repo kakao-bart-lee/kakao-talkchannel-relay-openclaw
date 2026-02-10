@@ -13,6 +13,7 @@ import (
 	"github.com/openclaw/relay-server-go/internal/middleware"
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/service"
+	"github.com/openclaw/relay-server-go/internal/util"
 )
 
 type PortalHandler struct {
@@ -45,17 +46,20 @@ func NewPortalHandler(
 	}
 }
 
-func (h *PortalHandler) Routes() chi.Router {
+func (h *PortalHandler) PublicRoutes() chi.Router {
 	r := chi.NewRouter()
 
 	r.Get("/api/stats/public", h.GetPublicStats)
-
-	// Code-based auth endpoints
 	r.Post("/api/auth/code", h.LoginWithCode)
 	r.Get("/api/code/stats", h.GetCodeStats)
 	r.Get("/api/code/messages", h.GetCodeMessages)
 
-	// Legacy endpoints (kept for backward compatibility)
+	return r
+}
+
+func (h *PortalHandler) AuthenticatedRoutes() chi.Router {
+	r := chi.NewRouter()
+
 	r.Post("/api/logout", h.Logout)
 	r.Get("/api/me", h.Me)
 	r.Get("/api/stats", h.GetStats)
@@ -71,34 +75,42 @@ func (h *PortalHandler) Routes() chi.Router {
 	return r
 }
 
+func (h *PortalHandler) requireUser(w http.ResponseWriter, r *http.Request) *model.PortalUser {
+	user := middleware.GetPortalUser(r.Context())
+	if user == nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
+		return nil
+	}
+	return user
+}
+
 func (h *PortalHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
+	if user == nil {
+		return
+	}
 
 	cookie, err := r.Cookie(middleware.PortalSessionCookie)
 	if err == nil && cookie.Value != "" {
 		h.portalService.Logout(r.Context(), cookie.Value)
 	}
 
-	event := audit.Event{
-		Type: audit.EventLogout,
+	audit.LogFromRequest(r, audit.Event{
+		Type:      audit.EventLogout,
+		UserID:    user.ID,
+		AccountID: user.AccountID,
 		Details: map[string]interface{}{
 			"target": "portal",
 		},
-	}
-	if user != nil {
-		event.UserID = user.ID
-		event.AccountID = user.AccountID
-	}
-	audit.LogFromRequest(r, event)
+	})
 
 	middleware.ClearSessionCookie(w, middleware.PortalSessionCookie, "/portal")
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
 func (h *PortalHandler) Me(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -142,9 +154,8 @@ func (h *PortalHandler) GetPublicStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PortalHandler) GetStats(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -175,9 +186,8 @@ func (h *PortalHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PortalHandler) GeneratePairingCode(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -200,9 +210,8 @@ func (h *PortalHandler) GeneratePairingCode(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *PortalHandler) ListConnections(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -224,23 +233,9 @@ func (h *PortalHandler) ListConnections(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (h *PortalHandler) getSessionUser(r *http.Request) *model.PortalUser {
-	cookie, err := r.Cookie(middleware.PortalSessionCookie)
-	if err != nil || cookie.Value == "" {
-		return nil
-	}
-
-	user, err := h.portalService.ValidateSession(r.Context(), cookie.Value)
-	if err != nil {
-		return nil
-	}
-	return user
-}
-
 func (h *PortalHandler) UnpairConnection(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -271,9 +266,8 @@ func (h *PortalHandler) UnpairConnection(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *PortalHandler) BlockConnection(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -314,9 +308,8 @@ func (h *PortalHandler) BlockConnection(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PortalHandler) GetToken(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -331,21 +324,18 @@ func (h *PortalHandler) GetToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var token string
-	if account.RelayToken != nil {
-		token = *account.RelayToken
-	}
+	hasToken := account.RelayTokenHash != nil && *account.RelayTokenHash != ""
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"token":     token,
+		"hasToken":  hasToken,
+		"message":   "Plaintext tokens are no longer stored. Use /api/token/regenerate to get a new token.",
 		"createdAt": account.CreatedAt.Format(time.RFC3339),
 	})
 }
 
 func (h *PortalHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -372,9 +362,8 @@ func (h *PortalHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PortalHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -411,9 +400,8 @@ func (h *PortalHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PortalHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
-	user := h.getSessionUser(r)
+	user := h.requireUser(w, r)
 	if user == nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
 		return
 	}
 
@@ -485,7 +473,7 @@ func (h *PortalHandler) LoginWithCode(w http.ResponseWriter, r *http.Request) {
 		secondsLeft := int(time.Until(resetAt).Seconds()) + 1
 		log.Warn().
 			Str("ip", clientIP).
-			Str("code", req.Code).
+			Str("code", util.MaskCode(req.Code)).
 			Msg("code login rate limit exceeded")
 
 		w.Header().Set("Retry-After", fmt.Sprintf("%d", secondsLeft))
@@ -497,7 +485,7 @@ func (h *PortalHandler) LoginWithCode(w http.ResponseWriter, r *http.Request) {
 
 	conversationKey, err := h.portalAccessService.VerifyCode(r.Context(), req.Code)
 	if err != nil {
-		log.Warn().Err(err).Str("code", req.Code).Msg("invalid portal code")
+		log.Warn().Err(err).Str("code", util.MaskCode(req.Code)).Msg("invalid portal code")
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Invalid or expired code"})
 		return
 	}

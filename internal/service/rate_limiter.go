@@ -73,13 +73,13 @@ func (rl *RateLimiter) CheckLimit(
 		log.Warn().
 			Err(err).
 			Str("key", key).
-			Msg("rate limit check failed, allowing request")
-		return true, time.Now().Add(window)
+			Msg("rate limit check failed, denying request for safety")
+		return false, time.Now().Add(window)
 	}
 
 	if len(result) != 2 {
-		log.Warn().Str("key", key).Msg("unexpected rate limit result")
-		return true, time.Now().Add(window)
+		log.Warn().Str("key", key).Msg("unexpected rate limit result, denying request for safety")
+		return false, time.Now().Add(window)
 	}
 
 	return result[0] == 1, time.Unix(result[1], 0)

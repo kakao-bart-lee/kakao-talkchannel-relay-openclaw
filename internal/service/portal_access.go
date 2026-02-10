@@ -17,6 +17,7 @@ import (
 	"github.com/openclaw/relay-server-go/internal/model"
 	"github.com/openclaw/relay-server-go/internal/repository"
 	redisclient "github.com/openclaw/relay-server-go/internal/redis"
+	"github.com/openclaw/relay-server-go/internal/util"
 )
 
 const (
@@ -63,7 +64,7 @@ func (s *PortalAccessService) GenerateCode(
 	existing, err := s.codeRepo.FindActiveByConversationKey(ctx, conversationKey)
 	if err == nil && existing != nil {
 		log.Info().
-			Str("code", existing.Code).
+			Str("code", util.MaskCode(existing.Code)).
 			Str("conversationKey", conversationKey).
 			Time("expiresAt", existing.ExpiresAt).
 			Msg("reusing existing portal access code")
@@ -91,7 +92,7 @@ func (s *PortalAccessService) GenerateCode(
 	}
 
 	log.Info().
-		Str("code", code).
+		Str("code", util.MaskCode(code)).
 		Str("conversationKey", conversationKey).
 		Time("expiresAt", pac.ExpiresAt).
 		Msg("portal access code created")
@@ -109,7 +110,7 @@ func (s *PortalAccessService) VerifyCode(
 	pac, err := s.codeRepo.FindActiveByCode(ctx, normalizedCode)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			log.Warn().Str("code", normalizedCode).Msg("invalid or expired portal code")
+			log.Warn().Str("code", util.MaskCode(normalizedCode)).Msg("invalid or expired portal code")
 			return "", fmt.Errorf("invalid or expired code")
 		}
 		return "", fmt.Errorf("verify portal code: %w", err)
@@ -122,7 +123,7 @@ func (s *PortalAccessService) VerifyCode(
 	}
 
 	log.Info().
-		Str("code", normalizedCode).
+		Str("code", util.MaskCode(normalizedCode)).
 		Str("conversationKey", pac.ConversationKey).
 		Msg("portal code verified")
 

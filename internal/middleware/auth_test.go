@@ -103,7 +103,7 @@ func (m *mockAccountRepo) Count(ctx context.Context) (int, error) {
 	return 0, nil
 }
 
-func (m *mockAccountRepo) UpdateToken(ctx context.Context, id, token, tokenHash string) (*model.Account, error) {
+func (m *mockAccountRepo) UpdateToken(ctx context.Context, id, tokenHash string) (*model.Account, error) {
 	return nil, nil
 }
 

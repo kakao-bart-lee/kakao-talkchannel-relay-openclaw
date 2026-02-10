@@ -24,7 +24,7 @@ func (m *SecurityHeadersMiddleware) Handler(next http.Handler) http.Handler {
 		}
 
 		csp := "default-src 'self'; " +
-			"script-src 'self' 'unsafe-inline'; " +
+			"script-src 'self'; " +
 			"style-src 'self' 'unsafe-inline'; " +
 			"img-src 'self' data: https:; " +
 			"font-src 'self'; " +

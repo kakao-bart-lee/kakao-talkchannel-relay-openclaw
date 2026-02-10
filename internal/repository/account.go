@@ -16,7 +16,7 @@ type AccountRepository interface {
 	FindAll(ctx context.Context, limit, offset int) ([]model.Account, error)
 	Create(ctx context.Context, params model.CreateAccountParams) (*model.Account, error)
 	Update(ctx context.Context, id string, params model.UpdateAccountParams) (*model.Account, error)
-	UpdateToken(ctx context.Context, id, token, tokenHash string) (*model.Account, error)
+	UpdateToken(ctx context.Context, id, tokenHash string) (*model.Account, error)
 	Delete(ctx context.Context, id string) error
 	Count(ctx context.Context) (int, error)
 	// WithTx returns a new repository that uses the given transaction
@@ -75,10 +75,10 @@ func (r *accountRepo) FindAll(ctx context.Context, limit, offset int) ([]model.A
 func (r *accountRepo) Create(ctx context.Context, params model.CreateAccountParams) (*model.Account, error) {
 	var account model.Account
 	err := r.db.GetContext(ctx, &account, `
-		INSERT INTO accounts (openclaw_user_id, relay_token, relay_token_hash, mode, rate_limit_per_minute)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO accounts (openclaw_user_id, relay_token_hash, mode, rate_limit_per_minute)
+		VALUES ($1, $2, $3, $4)
 		RETURNING *
-	`, params.OpenclawUserID, params.RelayToken, params.RelayTokenHash, params.Mode, params.RateLimitPerMin)
+	`, params.OpenclawUserID, params.RelayTokenHash, params.Mode, params.RateLimitPerMin)
 	if err != nil {
 		return nil, err
 	}
@@ -111,15 +111,14 @@ func (r *accountRepo) Count(ctx context.Context) (int, error) {
 	return count, err
 }
 
-func (r *accountRepo) UpdateToken(ctx context.Context, id, token, tokenHash string) (*model.Account, error) {
+func (r *accountRepo) UpdateToken(ctx context.Context, id, tokenHash string) (*model.Account, error) {
 	var account model.Account
 	err := r.db.GetContext(ctx, &account, `
 		UPDATE accounts SET
-			relay_token = $2,
-			relay_token_hash = $3,
-			updated_at = $4
+			relay_token_hash = $2,
+			updated_at = $3
 		WHERE id = $1
 		RETURNING *
-	`, id, token, tokenHash, time.Now())
+	`, id, tokenHash, time.Now())
 	return HandleNotFound(&account, err)
 }

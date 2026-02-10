@@ -63,13 +63,13 @@ func (rl *RedisRateLimiter) Check(ctx context.Context, accountID string, limit i
 
 	result, err := rateLimitScript.Run(ctx, rl.client, []string{key}, now, int64(rateLimitWindow.Seconds()), limit).Int64Slice()
 	if err != nil {
-		log.Warn().Err(err).Str("accountId", accountID).Msg("redis rate limit check failed, allowing request")
-		return true, limit - 1, now + int64(rateLimitWindow.Seconds())
+		log.Warn().Err(err).Str("accountId", accountID).Msg("redis rate limit check failed, denying request for safety")
+		return false, 0, now + int64(rateLimitWindow.Seconds())
 	}
 
 	if len(result) != 3 {
-		log.Warn().Str("accountId", accountID).Msg("unexpected redis rate limit result")
-		return true, limit - 1, now + int64(rateLimitWindow.Seconds())
+		log.Warn().Str("accountId", accountID).Msg("unexpected redis rate limit result, denying request for safety")
+		return false, 0, now + int64(rateLimitWindow.Seconds())
 	}
 
 	return result[0] == 1, int(result[1]), result[2]

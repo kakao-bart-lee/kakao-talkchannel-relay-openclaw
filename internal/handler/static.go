@@ -1,25 +1,33 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
 )
 
 type SPAHandler struct {
 	staticDir   string
 	indexFile   string
 	routePrefix string
+	absStaticDir string
 }
 
 func NewSPAHandler(staticDir string, routePrefix string) *SPAHandler {
+	absDir, err := filepath.Abs(staticDir)
+	if err != nil {
+		panic(fmt.Sprintf("failed to resolve static dir path %q: %v", staticDir, err))
+	}
 	return &SPAHandler{
-		staticDir:   staticDir,
-		indexFile:   "index.html",
-		routePrefix: routePrefix,
+		staticDir:    staticDir,
+		indexFile:    "index.html",
+		routePrefix:  routePrefix,
+		absStaticDir: absDir,
 	}
 }
 
@@ -47,7 +55,15 @@ func (h *SPAHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := filepath.Join(h.staticDir, path)
+	filePath := filepath.Join(h.staticDir, filepath.Clean(path))
+
+	// Path traversal protection
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil || (!strings.HasPrefix(absFilePath, h.absStaticDir+string(filepath.Separator)) && absFilePath != h.absStaticDir) {
+		log.Warn().Str("path", path).Msg("path traversal attempt blocked")
+		http.NotFound(w, r)
+		return
+	}
 
 	info, err := os.Stat(filePath)
 	if err == nil && !info.IsDir() {

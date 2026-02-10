@@ -65,7 +65,7 @@ type AdminService struct {
 	outboundRepo      repository.OutboundMessageRepository
 	portalUserRepo    repository.PortalUserRepository
 	pluginSessionRepo repository.SessionRepository
-	adminPassword     string
+	adminPasswordHash string
 	sessionSecret     string
 }
 
@@ -78,7 +78,7 @@ func NewAdminService(
 	outboundRepo repository.OutboundMessageRepository,
 	portalUserRepo repository.PortalUserRepository,
 	pluginSessionRepo repository.SessionRepository,
-	adminPassword, sessionSecret string,
+	adminPasswordHash, sessionSecret string,
 ) *AdminService {
 	return &AdminService{
 		db:                db,
@@ -89,13 +89,13 @@ func NewAdminService(
 		outboundRepo:      outboundRepo,
 		portalUserRepo:    portalUserRepo,
 		pluginSessionRepo: pluginSessionRepo,
-		adminPassword:     adminPassword,
+		adminPasswordHash: adminPasswordHash,
 		sessionSecret:     sessionSecret,
 	}
 }
 
 func (s *AdminService) Login(ctx context.Context, password string) (string, error) {
-	if !util.ConstantTimeEqual(password, s.adminPassword) {
+	if !util.CheckPasswordHash(password, s.adminPasswordHash) {
 		return "", nil
 	}
 
@@ -205,7 +205,6 @@ func (s *AdminService) CreateAccount(ctx context.Context, openclawUserID *string
 
 	account, err := s.accountRepo.Create(ctx, model.CreateAccountParams{
 		OpenclawUserID:  openclawUserID,
-		RelayToken:      token,
 		RelayTokenHash:  tokenHash,
 		Mode:            mode,
 		RateLimitPerMin: rateLimit,

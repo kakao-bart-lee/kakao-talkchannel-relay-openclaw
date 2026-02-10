@@ -10,21 +10,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRateLimiter_Basic(t *testing.T) {
-	// This test requires a running Redis instance
-	// Skip if REDIS_URL is not set
-	redisURL := "redis://localhost:6379/15" // Use DB 15 for tests
-	client, err := redis.ParseURL(redisURL)
+func newTestRedisClient(t *testing.T) *redis.Client {
+	t.Helper()
+	redisURL := "redis://localhost:6379/15"
+	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
+		t.Skip("Redis URL not parseable, skipping")
+	}
+	client := redis.NewClient(opts)
+	ctx := context.Background()
+	if err := client.Ping(ctx).Err(); err != nil {
+		client.Close()
 		t.Skip("Redis not available for testing")
 	}
+	client.FlushDB(ctx)
+	return client
+}
 
-	redisClient := redis.NewClient(client)
+func TestRateLimiter_Basic(t *testing.T) {
+	redisClient := newTestRedisClient(t)
 	defer redisClient.Close()
 
-	// Clear test data
 	ctx := context.Background()
-	redisClient.FlushDB(ctx)
 
 	limiter := NewRateLimiter(redisClient)
 
@@ -88,7 +95,7 @@ func TestRateLimiter_Basic(t *testing.T) {
 }
 
 func TestRateLimiter_GracefulFailure(t *testing.T) {
-	// Test with invalid Redis client (should allow requests gracefully)
+	// Test with invalid Redis client (should deny requests for safety)
 	invalidClient := redis.NewClient(&redis.Options{
 		Addr: "localhost:9999", // Invalid port
 	})
@@ -97,24 +104,17 @@ func TestRateLimiter_GracefulFailure(t *testing.T) {
 	limiter := NewRateLimiter(invalidClient)
 	ctx := context.Background()
 
-	// Should allow request even if Redis fails
+	// Should deny request when Redis fails (fail-closed for safety)
 	allowed, resetAt := limiter.CheckLimit(ctx, "test:key", 1, 1*time.Minute)
-	require.True(t, allowed, "Should gracefully allow request on Redis failure")
+	require.False(t, allowed, "Should deny request on Redis failure for safety")
 	require.True(t, resetAt.After(time.Now()), "Should return valid reset time")
 }
 
 func TestCheckCodeGenerationLimit(t *testing.T) {
-	redisURL := "redis://localhost:6379/15"
-	client, err := redis.ParseURL(redisURL)
-	if err != nil {
-		t.Skip("Redis not available for testing")
-	}
-
-	redisClient := redis.NewClient(client)
+	redisClient := newTestRedisClient(t)
 	defer redisClient.Close()
 
 	ctx := context.Background()
-	redisClient.FlushDB(ctx)
 
 	service := &PortalAccessService{
 		rateLimiter: NewRateLimiter(redisClient),
@@ -135,17 +135,10 @@ func TestCheckCodeGenerationLimit(t *testing.T) {
 }
 
 func TestCheckLoginLimit(t *testing.T) {
-	redisURL := "redis://localhost:6379/15"
-	client, err := redis.ParseURL(redisURL)
-	if err != nil {
-		t.Skip("Redis not available for testing")
-	}
-
-	redisClient := redis.NewClient(client)
+	redisClient := newTestRedisClient(t)
 	defer redisClient.Close()
 
 	ctx := context.Background()
-	redisClient.FlushDB(ctx)
 
 	service := &PortalAccessService{
 		rateLimiter: NewRateLimiter(redisClient),
