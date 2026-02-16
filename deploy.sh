@@ -9,6 +9,11 @@ CLOUD_SQL_INSTANCE="${CLOUD_SQL_INSTANCE:?CLOUD_SQL_INSTANCE is required}"
 VPC_CONNECTOR="${VPC_CONNECTOR:?VPC_CONNECTOR is required}"
 IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${SERVICE_NAME}"
 
+ENV_VARS="LOG_LEVEL=info,CALLBACK_TTL_SECONDS=55"
+if [[ -n "${PORTAL_BASE_URL:-}" ]]; then
+  ENV_VARS="${ENV_VARS},PORTAL_BASE_URL=${PORTAL_BASE_URL}"
+fi
+
 echo "Deploying $SERVICE_NAME to Cloud Run..."
 echo "  Project: $PROJECT_ID"
 echo "  Region:  $REGION"
@@ -45,7 +50,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --cpu-boost \
   --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
   --vpc-connector "$VPC_CONNECTOR" \
-  --set-env-vars "LOG_LEVEL=info,CALLBACK_TTL_SECONDS=55" \
+  --set-env-vars "${ENV_VARS}" \
   --set-secrets "DATABASE_URL=${SECRET_PREFIX:-kakao-relay}-database-url:latest,\
 REDIS_URL=${SECRET_PREFIX:-kakao-relay}-redis-url:latest,\
 ADMIN_PASSWORD=${SECRET_PREFIX:-kakao-relay}-admin-password:latest,\
