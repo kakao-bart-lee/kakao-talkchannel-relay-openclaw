@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/kakao-bart-lee/kakao-talkchannel-relay-openclaw/compare/kakao-talkchannel-relay-openclaw-v0.3.0...kakao-talkchannel-relay-openclaw-v0.4.0) (2026-03-04)
+
+
+### Features
+
+* **portal:** separate today outbound failure stats ([f096de2](https://github.com/kakao-bart-lee/kakao-talkchannel-relay-openclaw/commit/f096de219ddd2745559db43e7fb2dc8fc5a44145))
+
+
+### Bug Fixes
+
+* resolve routing panic and sync deployment script ([4857cea](https://github.com/kakao-bart-lee/kakao-talkchannel-relay-openclaw/commit/4857cea61131cfb00151d3227b8c33cf831b6d9b))
+
 ## [0.3.0](https://github.com/kakao-bart-lee/kakao-talkchannel-relay-openclaw/compare/kakao-talkchannel-relay-openclaw-v0.2.0...kakao-talkchannel-relay-openclaw-v0.3.0) (2026-02-10)
 
 
