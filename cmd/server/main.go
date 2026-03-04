@@ -173,11 +173,32 @@ func main() {
 	r.Route("/portal", func(r chi.Router) {
 		r.Use(securityHeadersMiddleware.Handler)
 		r.Use(csrfMiddleware.Handler)
-		r.Mount("/", portalHandler.PublicRoutes())
-		r.Group(func(r chi.Router) {
-			r.Use(portalSessionMiddleware.Handler)
-			r.Mount("/", portalHandler.AuthenticatedRoutes())
+
+		// API Routes
+		r.Route("/api", func(r chi.Router) {
+			// Public API
+			r.Get("/stats/public", portalHandler.GetPublicStats)
+			r.Post("/auth/code", portalHandler.LoginWithCode)
+			r.Get("/code/stats", portalHandler.GetCodeStats)
+			r.Get("/code/messages", portalHandler.GetCodeMessages)
+
+			// Authenticated API
+			r.Group(func(r chi.Router) {
+				r.Use(portalSessionMiddleware.Handler)
+				r.Post("/logout", portalHandler.Logout)
+				r.Get("/me", portalHandler.Me)
+				r.Get("/stats", portalHandler.GetStats)
+				r.Post("/pairing/generate", portalHandler.GeneratePairingCode)
+				r.Get("/connections", portalHandler.ListConnections)
+				r.Post("/connections/{conversationKey}/unpair", portalHandler.UnpairConnection)
+				r.Patch("/connections/{conversationKey}/block", portalHandler.BlockConnection)
+				r.Get("/token", portalHandler.GetToken)
+				r.Post("/token/regenerate", portalHandler.RegenerateToken)
+				r.Delete("/account", portalHandler.DeleteAccount)
+				r.Get("/messages", portalHandler.GetMessages)
+			})
 		})
+
 		r.NotFound(handler.StaticFileServer("static/portal", "/portal").ServeHTTP)
 	})
 

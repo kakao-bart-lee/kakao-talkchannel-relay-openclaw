@@ -46,7 +46,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --min-instances 0 \
   --max-instances 3 \
   --concurrency 100 \
-  --timeout 60s \
+  --timeout 3600s \
   --cpu-boost \
   --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
   --vpc-connector "$VPC_CONNECTOR" \
